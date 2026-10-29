@@ -655,7 +655,8 @@ export function ShopRow({ shop }: { shop: Shop }) {
         router.push({ pathname: "/loja/[id]", params: { id: shop.id } })
       }
       style={{
-        backgroundColor: colors.card,
+        opacity: shop.is_open ? 1 : 0.58,
+        backgroundColor: shop.is_open ? colors.card : "#EEEEEC",
         borderWidth: 1,
         borderColor: "#ECE7DB",
         padding: 12,
