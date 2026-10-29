@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ApiClient, ApiError, backendOrigin } from "../src/api";
-import { dateForApi } from "../src/domain/date";
+import { dateForApi, formatPreferredDate } from "../src/domain/date";
 test("the backend is a single trusted origin and production requires HTTPS", () => {
   assert.equal(
     backendOrigin("https://condovery.example", false),
@@ -164,4 +164,16 @@ test("private image byte conversion handles padding and enforces MIME and size l
   }
   assert.throws(() => encode([1], "text/html"), /inválida/);
   assert.throws(() => imageDataUri(new ArrayBuffer(5 * 1024 * 1024 + 1), "image/jpeg"), /inválida/);
+});
+
+test("preferred date mask formats digits, supports backspace and preserves API validation", () => {
+  assert.equal(formatPreferredDate("02"), "02");
+  assert.equal(formatPreferredDate("0211"), "02/11");
+  assert.equal(formatPreferredDate("02112026"), "02/11/2026");
+  assert.equal(formatPreferredDate("02/11/2026"), "02/11/2026");
+  assert.equal(formatPreferredDate("021120261234"), "02/11/2026");
+  assert.equal(formatPreferredDate("02/11/202"), "02/11/202");
+  assert.equal(formatPreferredDate("02/11/"), "02/11");
+  assert.equal(dateForApi(formatPreferredDate("02112026")), "2026-11-02");
+  assert.throws(() => dateForApi(formatPreferredDate("31022026")), /Data inválida/);
 });
