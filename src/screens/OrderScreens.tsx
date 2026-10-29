@@ -487,8 +487,9 @@ export function Orders() {
 export function OrderDetail({ success = false }: { success?: boolean }) {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { api } = useAuth();
-  const r = useResource<{ orders: Order[] }>("orders");
-  const order = r.data?.orders.find((o) => o.id === id);
+  // A historical/deep-linked order might be on page 10, not the first 20.
+  const r = useResource<{order:Order}>(id?"orders/"+encodeURIComponent(id):null);
+  const order = r.data?.order;
   const [rating, setRating] = useState(0),
     [review, setReview] = useState(""),
     [busy, setBusy] = useState(false),
