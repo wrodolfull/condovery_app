@@ -16,6 +16,8 @@ import {sellerDraftScope,parseSellerDraft,type ShopDraft} from "../domain/shop-d
 import {isCommercialProductCategory} from "../domain/category-purpose";
 import {loadSellerDraft,saveSellerDraft} from "../storage";
 import { mergeLatestOrders, orderHistoryPath, type OrdersPage } from "../domain/order-pagination";
+import {DailySalesChart} from "../components/DailySalesChart";
+import type {DailySale} from "../domain/seller-insights";
 
 type Shop = {
   id:string; name:string; status:string; description:string; whatsapp:string;
@@ -40,7 +42,13 @@ function fromShop(s:Shop):ShopForm {
 type Review={id:string;order_code:number;rating:number;description:string;status:string};
 type Fair={id:string;title:string;starts_at:string;ends_at:string};
 type FairApplication={fair_id:string;product_id:string;status:string};
-type Insight={summary:{orders_total:number;awaiting:number;completed:number;completed_cents:number;average_cents:number};topProducts:{product_id:string;name:string;units:number}[]};
+type Insight={
+  days:number;
+  summary:{orders_total:number;awaiting:number;confirmed:number;completed:number;cancelled:number;
+    completed_cents:string|number;average_cents:string|number};
+  topProducts:{product_id:string;name:string;units:number}[];
+  daily:DailySale[];
+};
 const tabs=["Pedidos","Produtos","Avaliações","Minha loja","Resultados","Feiras"] as const;
 type Tab=typeof tabs[number];
 const line={backgroundColor:"#FFFCF8",borderColor:"#E9E4DB",borderWidth:1,borderRadius:14,padding:14,gap:9} as const;
@@ -75,6 +83,9 @@ export default function SellerPanel() {
   const [reviews,setReviews]=useState<Review[]>([]);
   const [categories,setCategories]=useState<Category[]>([]);
   const [insight,setInsight]=useState<Insight|null>(null);
+  const [insightLoading,setInsightLoading]=useState(false);
+  const [insightError,setInsightError]=useState("");
+  const [insightRevision,setInsightRevision]=useState(0);
   const [fairs,setFairs]=useState<Fair[]>([]);
   const [applications,setApplications]=useState<FairApplication[]>([]);
   const [fairProducts,setFairProducts]=useState<{id:string;name:string}[]>([]);
@@ -196,9 +207,6 @@ export default function SellerPanel() {
         if(tab==="Avaliações"){
           const r=await api.request<{reviews:Review[]}>("shops/mine/reviews");
           if(active)setReviews(r.reviews);
-        }else if(tab==="Resultados"){
-          const r=await api.request<Insight>("seller/insights?days="+period);
-          if(active)setInsight(r);
         }else if(tab==="Feiras"){
           const r=await api.request<{fairs:Fair[];products:{id:string;name:string}[];applications:FairApplication[]}>("fairs/seller");
           if(active){setFairs(r.fairs);setFairProducts(r.products);setApplications(r.applications);}
@@ -206,7 +214,19 @@ export default function SellerPanel() {
       }catch(e){if(active)setError((e as Error).message);}
     };
     void task();return()=>{active=false;};
-  },[api,shop?.id,tab,period]);
+  },[api,shop?.id,tab]);
+  // Refresh results on focus and period changes. Do not show 30-day data under
+  // a 7-day heading while the new response is still loading.
+  useFocusEffect(useCallback(()=>{
+    if(tab!=="Resultados"||!shop?.id)return;
+    let active=true;
+    setInsight(null);setInsightError("");setInsightLoading(true);
+    void api.request<Insight>("seller/insights?days="+period)
+      .then(result=>{if(active)setInsight(result);})
+      .catch(error=>{if(active)setInsightError((error as Error).message);})
+      .finally(()=>{if(active)setInsightLoading(false);});
+    return ()=>{active=false;};
+  },[api,shop?.id,tab,period,insightRevision]));
   async function run(task:()=>Promise<unknown>) {
     if(busy)return;
     setBusy(true);setError("");setSuccess("");
@@ -492,14 +512,35 @@ export default function SellerPanel() {
           ])}/>
       </Card>}
       {tab==="Resultados"&&<View style={{gap:14}}>
-        <View style={{flexDirection:"row",gap:8}}>{([7,30,90] as const).map(n=><Pressable key={n} onPress={()=>setPeriod(n)}
-          style={{padding:12,borderRadius:13,backgroundColor:period===n?colors.yellow:"white"}}><T>{n} dias</T></Pressable>)}</View>
-        {insight?<><Card><T>Pedidos: {insight.summary.orders_total}</T><T>Em aberto: {insight.summary.awaiting}</T>
-          <T>Concluídos: {insight.summary.completed}</T><T bold>Vendas concluídas: {money(Number(insight.summary.completed_cents))}</T>
-          <T>Ticket médio: {money(Number(insight.summary.average_cents))}</T></Card>
-          <T heading style={{fontSize:21}}>Produtos mais vendidos</T>
-          {insight.topProducts.map(x=><View key={x.product_id} style={line}><T>{x.name} · {x.units} unidades</T></View>)}
-        </>:<Loading/>}
+        <T heading style={{fontSize:23}}>Inteligência da loja</T>
+        <View style={{flexDirection:"row",gap:8,flexWrap:"wrap"}}>{([7,30,90] as const).map(n=><Pressable
+          key={n} accessibilityRole="button" accessibilityState={{selected:period===n}}
+          onPress={()=>setPeriod(n)}
+          style={{paddingHorizontal:14,paddingVertical:11,borderRadius:13,borderWidth:1,
+            borderColor:period===n?colors.orange:colors.line,backgroundColor:period===n?colors.yellow:colors.card}}>
+          <T bold={period===n}>{n} dias</T>
+        </Pressable>)}</View>
+        <Button title="Atualizar resultados" secondary onPress={()=>setInsightRevision(n=>n+1)}/>
+        {insightError?<ErrorBox message={insightError} retry={()=>setInsightRevision(n=>n+1)}/>:null}
+        {insightLoading?<Loading/>:
+          insight&&insight.days===period?<><Card style={{gap:8}}>
+            <T>Pedidos recebidos: {insight.summary.orders_total}</T>
+            <T>Aguardando confirmação: {insight.summary.awaiting}</T>
+            <T>Confirmados: {insight.summary.confirmed}</T>
+            <T>Cancelados: {insight.summary.cancelled}</T>
+            <T>Concluídos: {insight.summary.completed}</T>
+            <T bold>Valor dos pedidos concluídos: {money(Number(insight.summary.completed_cents))}</T>
+            <T>Ticket médio concluído: {money(Number(insight.summary.average_cents))}</T>
+          </Card>
+          <DailySalesChart key={period} daily={insight.daily} period={period}/>
+          <T heading style={{fontSize:21}}>Produtos mais pedidos e concluídos</T>
+          {insight.topProducts.length?
+            insight.topProducts.map(x=><View key={x.product_id} style={line}>
+              <T>{x.name} · {x.units} unidades</T>
+            </View>):
+            <T style={{color:colors.muted}}>Nenhum produto em pedidos concluídos neste período.</T>}
+        </>:!insightError?<Empty title="Resultados indisponíveis"
+          body="Abra uma loja aprovada para consultar seus indicadores."/>:null}
       </View>}
       {tab==="Feiras"&&(fairs.length?fairs.map(f=><View key={f.id} style={line}>
         <T bold>{f.title}</T><T>Até {new Date(f.ends_at).toLocaleDateString("pt-BR")}</T>
