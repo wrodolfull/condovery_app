@@ -34,6 +34,7 @@ export type Product = {
   id: string;
   shop_id: string;
   shop_name?: string;
+  is_open?: boolean;
   category_id: string;
   name: string;
   description: string;

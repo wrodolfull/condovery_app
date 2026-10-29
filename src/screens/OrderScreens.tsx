@@ -37,6 +37,10 @@ export function Checkout() {
   const market = useMarket();
   const { cart } = market;
   const shop = cart.shop;
+  // Cart data may have been saved before the seller closed their store.
+  const liveShop = useResource<{shop: typeof shop;products:unknown[]}>(shop ? "shops/" + shop.id : null);
+  const shopClosed = shop?.is_open===false || liveShop.data?.shop?.is_open===false;
+  const blocked = !!shop && (shopClosed || liveShop.loading || !!liveShop.error);
   const [fulfillment, setFulfillment] = useState<"delivery" | "pickup">(
       shop?.delivery_enabled ? "delivery" : "pickup",
     ),
@@ -89,6 +93,13 @@ export function Checkout() {
     setBusy(true);
     setError("");
     try {
+      if(!shop)throw new Error("Carrinho indisponível.");
+      // Always recheck the current store state before resuming or sending.
+      const latest = await api.request<{shop:{is_open:boolean}}>("shops/"+shop.id);
+      if(!latest.shop.is_open){
+        await liveShop.reload().catch(()=>{});
+        throw new Error("Loja fechada. Não é possível realizar pedidos agora.");
+      }
       let body = cart.pending?.payload;
       if (!body) {
         if (!chosen) throw new Error("Escolha uma forma de pagamento.");
@@ -178,7 +189,13 @@ export function Checkout() {
       <T heading style={{ fontSize: 27 }}>
         Seu pedido · {shop.name}
       </T>
-      <ErrorBox message={error} />
+      <ErrorBox message={error || liveShop.error} />
+      {blocked&&<Card style={{backgroundColor:"#EFEFEC",borderColor:"#D9D9D5"}}>
+        <T bold style={{color:"#555555"}}>{shopClosed?"Loja fechada":"Verificando disponibilidade da loja"}</T>
+        <T style={{color:"#666666"}}>{shopClosed
+          ?"Os produtos podem ser consultados, mas não é possível finalizar pedidos enquanto a loja estiver fechada."
+          :"Aguarde a verificação antes de enviar o pedido."}</T>
+      </Card>}
       {cart.pending && (
         <Card>
           <T bold>Uma tentativa de pedido está em andamento.</T>
@@ -193,6 +210,8 @@ export function Checkout() {
           />
         </Card>
       )}
+      {shopClosed&&!cart.pending&&<Button title="Esvaziar carrinho" secondary onPress={()=>market.clear()}/>}
+      <View style={{opacity:blocked?0.55:1}} pointerEvents={blocked?"none":"auto"}>
       {cart.items.map((i, index) => (
         <Card key={i.key}>
           <T bold>{i.product.name}</T>
@@ -327,6 +346,7 @@ export function Checkout() {
           ))}
         </>
       )}
+      </View>
       <Card>
         <T>Subtotal: {money(activeQuote?.subtotal_cents ?? subtotal)}</T>
         <T>Taxa de entrega: {money(activeQuote?.delivery_fee_cents ?? fee)}</T>
@@ -349,6 +369,7 @@ export function Checkout() {
               : "Enviar pedido"
         }
         busy={busy}
+        disabled={blocked}
         onPress={() => void finish()}
       />
     </Screen>

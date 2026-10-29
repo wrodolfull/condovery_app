@@ -760,7 +760,7 @@ export function ShopDetail() {
       {resource.loading && <Loading />}
       {shop && (
         <>
-          <View>
+          <View style={{opacity:shop.is_open?1:0.48}}>
             <Picture
               path={shop.cover_image}
               label={"Capa " + shop.name}
@@ -990,12 +990,13 @@ export function ShopDetail() {
               <Benefit Icon={Clock3} label={shop.lead_time} />
             )}
           </View>
+          {!shop.is_open&&<View accessibilityRole="alert" style={{backgroundColor:"#EEEEEC",borderRadius:14,padding:14}}><T bold style={{color:"#575757"}}>Loja fechada</T><T style={{color:"#666666"}}>Compras temporariamente indisponíveis. Os produtos continuam visíveis para consulta.</T></View>}
           {offers.length>0&&<View style={{gap:12}}>
             <Section title="Ofertas"/>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}
               style={{marginHorizontal:-15}} contentContainerStyle={{gap:13,paddingHorizontal:15,paddingBottom:8}}>
               {offers.map(p=><View key={p.id} style={{width:174}}>
-                <ProductCard product={{...p,shop_name:shop.name}} width={174}/>
+                <ProductCard product={{...p,shop_name:shop.name,is_open:shop.is_open}} width={174}/>
               </View>)}
             </ScrollView>
           </View>}
@@ -1004,6 +1005,7 @@ export function ShopDetail() {
             products={(resource.data?.products ?? []).map((p) => ({
               ...p,
               shop_name: shop.name,
+              is_open: shop.is_open,
             }))}
           />
           {!resource.data?.products.length && (
@@ -1106,6 +1108,7 @@ export function ProductDetail() {
   const p = r.data?.products.find((p) => p.id === id),
     shop = r.data?.shop;
   const market = useMarket();
+  const purchasable = !!p && !!shop && shop.is_open && p.visibility==="available" && p.stock!==0;
   const [qty, setQty] = useState(1),
     [note, setNote] = useState(""),
     [choices, setChoices] = useState<Selection>({}),
@@ -1125,12 +1128,13 @@ export function ProductDetail() {
       {r.loading && <Loading />}
       {p && shop ? (
         <>
-          <Picture
+          <View style={{opacity:purchasable?1:0.45}}><Picture
             path={p.image_url}
             label={p.name}
             aspectRatio={1.15}
             radius={25}
-          />
+          /></View>
+          {!purchasable&&<Card style={{backgroundColor:"#EFEFEC"}}><T bold>{shop.is_open?"Produto indisponível":"Loja fechada"}</T><T>Compras temporariamente indisponíveis.</T></Card>}
           <T heading style={{ fontSize: 30, lineHeight: 36 }}>
             {p.name}
           </T>
@@ -1139,6 +1143,7 @@ export function ProductDetail() {
           <T heading style={{ fontSize: 24 }}>
             {money(unitPrice(p) + extra)}
           </T>
+          <View pointerEvents={purchasable?"auto":"none"} style={{gap:14,opacity:purchasable?1:0.5}}>
           {p.option_groups?.map((group) => (
             <Card key={group.id}>
               <T bold>
@@ -1197,9 +1202,7 @@ export function ProductDetail() {
             title={
               "Adicionar ao carrinho · " + money((unitPrice(p) + extra) * qty)
             }
-            disabled={
-              p.visibility !== "available" || p.stock === 0 || !shop.is_open
-            }
+            disabled={!purchasable}
             onPress={() => {
               void market
                 .add(p, shop, qty, note, choices)
@@ -1209,6 +1212,7 @@ export function ProductDetail() {
                 .catch((e) => setError(e.message));
             }}
           />
+          </View>
           <Button
             title="Denunciar produto"
             secondary

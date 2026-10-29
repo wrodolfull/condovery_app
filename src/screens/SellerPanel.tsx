@@ -3,6 +3,7 @@ import { Alert, Pressable, ScrollView, Switch, View } from "react-native";
 import { randomUUID } from "expo-crypto";
 import { useFocusEffect } from "expo-router";
 import { useAuth } from "../auth";
+import { useMarket } from "../market";
 import { Button, Card, Empty, ErrorBox, Field, Loading, Picture, Screen, T } from "../ui";
 import { money, colors } from "../theme";
 import { uploadPicture } from "../upload";
@@ -45,6 +46,7 @@ const line={backgroundColor:"#FFFCF8",borderColor:"#E9E4DB",borderWidth:1,border
 
 export default function SellerPanel() {
   const {api}=useAuth();
+  const market=useMarket();
   const [tab,setTab]=useState<Tab>("Pedidos");
   const [shop,setShop]=useState<Shop|null>(null);
   const [products,setProducts]=useState<Product[]>([]);
@@ -160,7 +162,10 @@ export default function SellerPanel() {
         <View style={{flexDirection:"row",alignItems:"center",justifyContent:"space-between"}}>
           <T bold>Loja aberta</T>
           <Switch value={shop.is_open} disabled={busy||shop.status!=="approved"}
-            onValueChange={is_open=>void run(async()=>{await api.request("shops/mine/status","PATCH",{is_open});})}/>
+            onValueChange={is_open=>void run(async()=>{
+              await api.request("shops/mine/status","PATCH",{is_open});
+              await market.home.reload();
+            })}/>
         </View>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:8}}>

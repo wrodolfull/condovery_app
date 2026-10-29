@@ -437,7 +437,8 @@ export function ProductCard({
 }) {
   const market = useMarket();
   const fav = market.favorites.data?.ids.includes(p.id);
-  const unavailable = p.stock === 0 || p.visibility === "unavailable";
+  const closed = p.is_open === false;
+  const unavailable = closed || p.stock === 0 || p.visibility !== "available";
   return (
     <View
       style={[
@@ -445,12 +446,15 @@ export function ProductCard({
         {
           width: width ?? "100%",
           backgroundColor: unavailable ? "#F0F0EE" : "#FFFCF8",
+          opacity: closed ? 0.65 : 1,
         },
       ]}
     >
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={"Ver " + p.name}
+        accessibilityState={{disabled:unavailable}}
+        disabled={unavailable}
         onPress={() =>
           router.push({
             pathname: "/produto/[shop]/[id]",
@@ -536,7 +540,7 @@ export function ProductCard({
           pointerEvents="none"
         >
           <T bold style={{ fontSize: 10, color: "white", lineHeight: 15 }}>
-            {p.stock === 0 ? "Esgotado" : "Indisponível"}
+            {closed ? "Loja fechada" : p.stock === 0 ? "Esgotado" : "Indisponível"}
           </T>
         </View>
       )}
@@ -545,7 +549,8 @@ export function ProductCard({
         accessibilityLabel={
           fav ? "Remover dos favoritos" : "Salvar nos favoritos"
         }
-        accessibilityState={{ selected: !!fav }}
+        accessibilityState={{ selected: !!fav, disabled: closed }}
+        disabled={closed}
         onPress={() => market.toggleFavorite(p.id).catch(alertError)}
         style={{
           position: "absolute",
@@ -646,7 +651,8 @@ export function ShopRow({ shop }: { shop: Shop }) {
         router.push({ pathname: "/loja/[id]", params: { id: shop.id } })
       }
       style={{
-        backgroundColor: colors.card,
+        opacity: shop.is_open ? 1 : 0.58,
+        backgroundColor: shop.is_open ? colors.card : "#EEEEEC",
         borderWidth: 1,
         borderColor: "#ECE7DB",
         padding: 12,
