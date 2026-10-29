@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { AppState } from "react-native";
 import { useFocusEffect } from "expo-router";
 
@@ -9,8 +9,9 @@ export function useFocusedOrderRefresh(
   reload: () => Promise<unknown>, key: string, poll = true,
 ): void {
   const reloadRef = useRef(reload);
-  reloadRef.current = reload;
+  useEffect(() => { reloadRef.current = reload; }, [reload]);
   useFocusEffect(useCallback(() => {
+    if (!key) return;
     let active = true;
     let fetching = false;
     let lastRequest = 0;
