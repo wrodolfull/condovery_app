@@ -80,7 +80,7 @@ export function Home() {
     .filter((p) => p.promo_price_cents != null || p.is_featured)
     .slice(0, 8);
   const products = query
-    ? catalog.products
+    ? catalog.products.slice(0, 24)
     : (home.data?.products ?? []).slice(0, 10);
   return (
     <Screen
@@ -270,10 +270,11 @@ export function Home() {
       )}
       {query && catalog.hasMore && (
         <Button
-          title="Mostrar mais produtos"
-          busy={catalog.loading}
+          title="Ver todos os resultados"
           secondary
-          onPress={catalog.next}
+          onPress={() =>
+            router.push({ pathname: "/explorar", params: { busca: query } })
+          }
         />
       )}
       {!query && (
@@ -561,9 +562,9 @@ type ExploreRow =
   | { kind: "shop"; key: string; shop: Shop }
   | { kind: "more" | "empty" | "loading" | "shops-title"; key: string };
 export function Explore() {
-  const params = useLocalSearchParams<{ categoria?: string; ofertas?: string }>();
+  const params = useLocalSearchParams<{ categoria?: string; ofertas?: string; busca?: string }>();
   const { home } = useMarket();
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(params.busca ?? "");
   const category = params.categoria ?? "";
   const catalog = useCatalog(query, category);
   const { loading, error, hasMore } = catalog;
@@ -615,7 +616,7 @@ export function Explore() {
               selected={category}
               onSelect={setCategory}
             />
-            <ErrorBox message={error} retry={() => void catalog.next()} />
+            <ErrorBox message={error} />
           </View>
         }
         renderItem={({ item }) => {

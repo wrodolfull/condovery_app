@@ -118,7 +118,17 @@ export function AdsCarousel({ campaigns }: { campaigns: AdCampaign[] }) {
             label={ad.headline}
             height={Math.min(330, Math.max(190, dimensions.width * 0.48))}
             radius={0}
-            fallback={<View style={{ flex: 1, backgroundColor: "#F4F4F4" }} />}
+            fallback={
+              <View style={{
+                flex: 1, backgroundColor: "#F4F4F4", padding: 18,
+                justifyContent: "center", alignItems: "center", gap: 8,
+              }}>
+                <T bold style={{ textAlign: "center" }}>{ad.merchant_name}</T>
+                <T style={{ textAlign: "center", color: "#626262" }}>
+                  {ad.headline}
+                </T>
+              </View>
+            }
           />
           <View
             style={{

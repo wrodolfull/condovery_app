@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { Alert, Pressable, Switch, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
+import {
+  Bell, ChevronRight, CircleHelp, Gift, LogOut, Receipt,
+  Settings, ShieldCheck, Store, Trash2,
+} from "lucide-react-native";
 import { useAuth } from "../auth";
 import { useResource } from "../hooks";
 import { usePush } from "../push";
@@ -21,74 +25,174 @@ import { openWeb } from "../external";
 import { uploadPicture } from "../upload";
 import type { Notice } from "../types";
 import { helpArticles } from "../domain/help-content";
+type AccountLink = {
+  label: string;
+  description: string;
+  icon: React.ReactNode;
+  onPress: () => void;
+};
 export function Account() {
   const auth = useAuth();
+  const viewer = auth.viewer;
+  const webPanel = () => void openWeb(auth.api.web("/")).catch(alertError);
+  const logout = () =>
+    Alert.alert(
+      "Sair da conta?",
+      "Você poderá entrar novamente a qualquer momento.",
+      [
+        { text: "Continuar aqui", style: "cancel" },
+        { text: "Sair", onPress: () => void auth.logout().catch(alertError) },
+      ],
+    );
+  const shortcuts: AccountLink[] = [
+    {
+      label: "Feiras do condomínio",
+      description: "Descubra as feiras da vizinhança",
+      icon: <Gift size={22} color={colors.ink} />,
+      onPress: () => router.push("/feiras"),
+    },
+    {
+      label: "Minha loja / Quero vender",
+      description: "Gerencie sua loja no navegador",
+      icon: <Store size={22} color={colors.ink} />,
+      onPress: webPanel,
+    },
+    {
+      label: "Meus pedidos",
+      description: "Acompanhe suas compras",
+      icon: <Receipt size={22} color={colors.ink} />,
+      onPress: () => router.push("/pedidos"),
+    },
+    {
+      label: "Notificações",
+      description: "Avisos de lojas e do condomínio",
+      icon: <Bell size={22} color={colors.ink} />,
+      onPress: () => router.push("/notificacoes"),
+    },
+    {
+      label: "Preferências de notificações",
+      description: "Escolha os avisos que deseja receber",
+      icon: <Settings size={22} color={colors.ink} />,
+      onPress: () => router.push("/preferencias"),
+    },
+    {
+      label: "Central de ajuda",
+      description: "Tire dúvidas sobre compras e feiras",
+      icon: <CircleHelp size={22} color={colors.ink} />,
+      onPress: () => router.push("/ajuda"),
+    },
+  ];
+  if (viewer?.role === "admin")
+    shortcuts.push({
+      label: "Administração",
+      description: "Acesse o painel administrativo na web",
+      icon: <ShieldCheck size={22} color={colors.ink} />,
+      onPress: webPanel,
+    });
+  shortcuts.push({
+    label: "Sair",
+    description: "Encerrar sessão neste dispositivo",
+    icon: <LogOut size={22} color={colors.ink} />,
+    onPress: logout,
+  });
+  if (viewer?.role === "resident")
+    shortcuts.push({
+      label: "Excluir minha conta",
+      description: "Encerrar definitivamente seu acesso",
+      icon: <Trash2 size={22} color="#BA4538" />,
+      onPress: () => router.push("/excluir-conta"),
+    });
   return (
     <Screen title="Minha conta">
-      <Picture
-        path={auth.viewer?.avatar_image}
-        label="Minha foto"
-        height={120}
-      />
-      <T heading style={{ fontSize: 27 }}>
-        {auth.viewer?.name}
-      </T>
-      <T>{auth.viewer?.condominium_name}</T>
-      <T>
-        {auth.viewer?.tower} · Apartamento {auth.viewer?.apartment}
-      </T>
-      {[
-        ["Meu perfil", "/perfil"],
-        ["Meus pedidos", "/pedidos"],
-        ["Notificações", "/notificacoes"],
-        ["Preferências de notificações", "/preferencias"],
-        ["Central de ajuda", "/ajuda"],
-      ].map(([label, path]) => (
+      <View style={{ gap: 4 }}>
+        <T heading style={{ fontSize: 28 }}>Meu perfil</T>
+        <T style={{ color: colors.muted }}>
+          Seu endereço, seus pedidos e tudo sobre sua conta.
+        </T>
+      </View>
+      <Card style={{ gap: 17 }}>
+        <View style={{ flexDirection: "row", gap: 14, alignItems: "center" }}>
+          <View style={{ width: 72, height: 72, borderRadius: 36, overflow: "hidden" }}>
+            <Picture
+              path={viewer?.avatar_image}
+              label="Minha foto"
+              height={72}
+              radius={36}
+              fallback={
+                <View style={{
+                  flex: 1, justifyContent: "center", alignItems: "center",
+                  backgroundColor: "#F0E8D8",
+                }}>
+                  <T heading style={{ fontSize: 27 }}>
+                    {viewer?.name.charAt(0).toUpperCase() ?? "?"}
+                  </T>
+                </View>
+              }
+            />
+          </View>
+          <View style={{ flex: 1, gap: 3 }}>
+            <T bold style={{ fontSize: 17 }}>{viewer?.name}</T>
+            <T style={{ fontSize: 12, color: colors.muted }}>{viewer?.email}</T>
+            <T style={{ fontSize: 12, color: colors.muted }} numberOfLines={2}>
+              {viewer?.condominium_name} · {viewer?.tower} · Apto. {viewer?.apartment}
+            </T>
+          </View>
+        </View>
         <Button
-          key={path}
-          title={label}
+          title="Editar meu perfil e minha foto"
           secondary
-          onPress={() => router.push(path as "/perfil")}
+          onPress={() => router.push("/perfil")}
         />
-      ))}
-      <Button
-        title="Termos de uso"
-        secondary
-        onPress={() =>
-          void openWeb(auth.api.web("/termos-de-uso")).catch(alertError)
-        }
-      />
-      <Button
-        title="Política de privacidade"
-        secondary
-        onPress={() =>
-          void openWeb(auth.api.web("/politica-de-privacidade")).catch(
-            alertError,
-          )
-        }
-      />
-      <Button
-        title="Sair da conta"
-        secondary
-        onPress={() =>
-          Alert.alert(
-            "Sair da conta?",
-            "Você poderá entrar novamente a qualquer momento.",
-            [
-              { text: "Continuar aqui", style: "cancel" },
-              {
-                text: "Sair",
-                onPress: () => void auth.logout().catch(() => {}),
-              },
-            ],
-          )
-        }
-      />
-      <Button
-        title="Excluir minha conta"
-        secondary
-        onPress={() => router.push("/excluir-conta")}
-      />
+      </Card>
+      <View style={{ gap: 0 }}>
+        {shortcuts.map((item) => (
+          <Pressable
+            key={item.label}
+            accessibilityRole="button"
+            accessibilityLabel={item.label}
+            onPress={item.onPress}
+            style={{
+              backgroundColor: "white",
+              borderWidth: 1,
+              borderColor: colors.line,
+              borderRadius: 13,
+              paddingHorizontal: 16,
+              paddingVertical: 14,
+              marginBottom: 8,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 13,
+            }}
+          >
+            {item.icon}
+            <View style={{ flex: 1, gap: 2 }}>
+              <T bold style={{ fontSize: 14 }}>{item.label}</T>
+              <T style={{ color: colors.muted, fontSize: 11, lineHeight: 16 }}>
+                {item.description}
+              </T>
+            </View>
+            <ChevronRight size={19} color={colors.muted} />
+          </Pressable>
+        ))}
+      </View>
+      <View style={{ gap: 8 }}>
+        <T heading style={{ fontSize: 20 }}>Privacidade e termos</T>
+        <T style={{ color: colors.muted, fontSize: 12 }}>
+          Consulte como seus dados são tratados e as regras de uso do Condovery.
+        </T>
+        <Button
+          title="Termos de uso"
+          secondary
+          onPress={() => void openWeb(auth.api.web("/termos-de-uso")).catch(alertError)}
+        />
+        <Button
+          title="Política de privacidade"
+          secondary
+          onPress={() =>
+            void openWeb(auth.api.web("/politica-de-privacidade")).catch(alertError)
+          }
+        />
+      </View>
     </Screen>
   );
 }
