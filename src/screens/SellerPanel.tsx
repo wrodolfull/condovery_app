@@ -44,6 +44,18 @@ const tabs=["Pedidos","Produtos","Avaliações","Minha loja","Resultados","Feira
 type Tab=typeof tabs[number];
 const line={backgroundColor:"#FFFCF8",borderColor:"#E9E4DB",borderWidth:1,borderRadius:14,padding:14,gap:9} as const;
 
+function SellerReviewRows({reviews,busy,onModerate}:{reviews:Review[];busy:boolean;onModerate:(id:string,status:"approved"|"rejected")=>void}) {
+  if(!reviews.length)return <Empty title="Sem avaliações" body="As avaliações dos compradores aparecerão aqui."/>;
+  return <>{reviews.map(review=><View key={review.id} style={line}>
+    <T bold>Pedido #{review.order_code} · {review.rating}/5 estrelas</T>
+    <T>{review.description}</T>
+    <T>{review.status==="pending"?"Aguardando moderação":review.status==="approved"?"Aprovada":"Recusada"}</T>
+    {review.status==="pending"&&(["approved","rejected"] as const).map(status=>
+      <Button key={status} title={status==="approved"?"Aprovar avaliação":"Rejeitar avaliação"} secondary busy={busy}
+        onPress={()=>onModerate(review.id,status)}/>)}
+  </View>)}</>;
+}
+
 export default function SellerPanel() {
   const {api,viewer}=useAuth();
   const ownerId=viewer?.id??'';
@@ -420,13 +432,7 @@ export default function SellerPanel() {
             })}])}/>
         </View>)}
       </>)}
-      {tab==="Avaliações"&&(reviews.length?reviews.map(r=><View key={r.id} style={line}>
-        <T bold>Pedido #{r.order_code} · {r.rating}/5 estrelas</T>
-        <T>{r.description}</T><T>{r.status==="pending"?"Aguardando moderação":r.status==="approved"?"Aprovada":"Recusada"}</T>
-        {r.status==="pending"&&(["approved","rejected"] as const).map(status=>
-          <Button key={status} title={status==="approved"?"Aprovar avaliação":"Rejeitar avaliação"} secondary busy={busy}
-            onPress={()=>moderateReview(r.id,status)}/>)}
-      </View>):<Empty title="Sem avaliações" body="As avaliações dos compradores aparecerão aqui."/>)}
+      {tab==="Avaliações"&&<SellerReviewRows reviews={reviews} busy={busy} onModerate={moderateReview}/>}
       {tab==="Minha loja"&&<Card>
         <T heading style={{fontSize:21}}>Dados da loja</T>
         {draftDirty&&<View style={{backgroundColor:"#FFF5D9",padding:12,borderRadius:12,gap:8}}>
