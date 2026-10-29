@@ -32,6 +32,7 @@ import {
   Bell,
   Clock3,
   Share2,
+  Heart,
   Store,
   Truck,
 } from "lucide-react-native";
@@ -68,6 +69,7 @@ import { RoundedStars } from "../components/RoundedStars";
 import type { Category, Product, Shop } from "../types";
 import { AdsCarousel, type AdCampaign } from "../components/AdsCarousel";
 import { FairHomeTeaser } from "../components/FairCards";
+import { ShopShareSheet } from "../components/ShopShareSheet";
 export function Home() {
   const { viewer } = useAuth();
   const { home } = useMarket();
@@ -710,6 +712,8 @@ export function Favorites() {
   );
 }
 export function ShopDetail() {
+  const [sharing,setSharing]=useState(false);
+  const [savingShop,setSavingShop]=useState(false);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { api } = useAuth();
   const resource = useResource<{ shop: Shop; products: Product[] }>(
@@ -728,6 +732,20 @@ export function ShopDetail() {
   const subscription = useResource<{ subscribed: boolean }>(
     shop ? "push/shops/" + shop.id : null,
   );
+  const savedShops = useResource<{ids:string[];shops:Shop[]}>(shop ? "favorite-shops" : null);
+  const saved = !!shop && !!savedShops.data?.ids.includes(shop.id);
+  const offers = (resource.data?.products ?? []).filter(p=>
+    p.visibility==="available" && p.stock!==0 && p.promo_price_cents!=null &&
+    p.promo_price_cents>0 && p.promo_price_cents<p.price_cents,
+  );
+  const toggleShopSave = async () => {
+    if(!shop||savingShop)return;
+    setSavingShop(true);
+    try{
+      await api.request(saved ? "favorite-shops/"+shop.id : "favorite-shops",saved ? "DELETE":"POST",saved?undefined:{shop_id:shop.id});
+      await savedShops.reload();
+    }catch(e){alertError(e);}finally{setSavingShop(false);}
+  };
   return (
     <Screen title="Loja" back backLabel="Voltar às lojas">
       <ErrorBox
@@ -813,11 +831,7 @@ export function ShopDetail() {
               </View>
               <Pressable
                 accessibilityRole="button"
-                onPress={() =>
-                  void Share.share({
-                    message: shop.name + " — " + api.web("/loja/" + shop.slug),
-                  }).catch(alertError)
-                }
+                onPress={() => setSharing(true)}
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
@@ -836,6 +850,20 @@ export function ShopDetail() {
                 <T bold style={{ fontSize: 12, color: "#5D4325" }}>
                   Compartilhar loja
                 </T>
+              </Pressable>
+              <Pressable accessibilityRole="button"
+                accessibilityLabel={saved?"Remover loja dos salvos":"Salvar loja"}
+                accessibilityState={{selected:saved,disabled:savingShop}}
+                disabled={savingShop || savedShops.loading}
+                onPress={()=>void toggleShopSave()}
+                style={{
+                  flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,
+                  minHeight:39,borderWidth:1,borderColor:saved?"#EFB4A9":colors.line,
+                  backgroundColor:saved?"#FFF0E8":"#FFFCF8",
+                  borderRadius:99,paddingVertical:9,paddingHorizontal:13,
+                }}>
+                <Heart size={17} color={saved?"#D8553C":colors.ink} fill={saved?"#D8553C":"none"}/>
+                <T bold style={{fontSize:12}}>{saved?"Loja salva":"Salvar loja"}</T>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
@@ -957,6 +985,15 @@ export function ShopDetail() {
               <Benefit Icon={Clock3} label={shop.lead_time} />
             )}
           </View>
+          {offers.length>0&&<View style={{gap:12}}>
+            <Section title="Ofertas"/>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}
+              style={{marginHorizontal:-15}} contentContainerStyle={{gap:13,paddingHorizontal:15,paddingBottom:8}}>
+              {offers.map(p=><View key={p.id} style={{width:174}}>
+                <ProductCard product={{...p,shop_name:shop.name}} width={174}/>
+              </View>)}
+            </ScrollView>
+          </View>}
           <Section title="Produtos da loja" />
           <ProductGrid
             products={(resource.data?.products ?? []).map((p) => ({
@@ -1042,6 +1079,8 @@ export function ShopDetail() {
           )}
         </>
       )}
+      {!!shop&&<ShopShareSheet visible={sharing} onClose={()=>setSharing(false)}
+        shopName={shop.name} url={api.web("/loja/"+shop.slug)}/>}
     </Screen>
   );
 }
