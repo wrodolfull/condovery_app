@@ -118,10 +118,12 @@ const campaigns = [0, 1].map((i) => ({
 }));
 const navLabels = ["Início", "Explorar", "Salvos", "Pedidos", "Conta"];
 
-async function enter(page: Page, withAds = true, withFairs = true, extendedCatalog = false) {
+async function enter(page: Page, withAds = true, withFairs = true, extendedCatalog = false, closedShop = false) {
   const errors: string[] = [],
     impressions: string[] = [];
   let favoriteIds: string[] = [];
+  const activeShop={...shop,is_open:!closedShop};
+  const activeProducts=products.map(p=>({...p,is_open:!closedShop}));
   let savedShopIds: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   const image = await readFile("assets/icon.png");
@@ -166,8 +168,8 @@ async function enter(page: Page, withAds = true, withFairs = true, extendedCatal
     else if (endpoint === "home")
       value = {
         categories: [{ id: id(4), name: "Bolos e doces", icon: "cake-slice" }],
-        shops: [shop],
-        products,
+        shops: [activeShop],
+        products: activeProducts,
       };
     else if (endpoint === "favorites" && request.method() === "POST") {
       favoriteIds.push(request.postDataJSON().product_id);
@@ -206,7 +208,7 @@ async function enter(page: Page, withAds = true, withFairs = true, extendedCatal
             id: String(i + 1).padStart(8, "0") + "-2222-4333-8444-555555555555",
             name: "Bolo da vizinhança " + (i + 1),
           }))
-        : products;
+        : activeProducts;
       const matched = all.filter((p) =>
         p.name
           .toLowerCase()
@@ -217,7 +219,7 @@ async function enter(page: Page, withAds = true, withFairs = true, extendedCatal
         hasMore: matched.length > (pageIndex + 1) * limit,
       };
     }
-    else if (endpoint === "shops/" + shop.id) value = { shop, products };
+    else if (endpoint === "shops/" + shop.id) value = { shop:activeShop, products:activeProducts };
     else if (endpoint.endsWith("/reviews"))
       value = {
         summary: { average: 5, count: 1 },
@@ -356,6 +358,17 @@ for (const width of [360, 390, 430]) {
     expect(errors).toEqual([]);
   });
 }
+
+test("closed stores show disabled, grey product cards without purchase navigation",async({page})=>{
+  const {errors}=await enter(page,true,true,false,true);
+  await expect(page.getByRole("button",{name:"Ver Bolo de cenoura",exact:true}).first()).toBeDisabled();
+  await page.getByRole("tab",{name:"Explorar",exact:true}).click();
+  await page.getByRole("button",{name:"Ver loja Loja do Vizinho",exact:true}).filter({visible:true}).click();
+  await expect(page.getByText("Loja fechada",{exact:true}).first()).toBeVisible();
+  await expect(page.getByRole("button",{name:"Ver Bolo de cenoura",exact:true}).first()).toBeDisabled();
+  await expect(page.getByText("Compras temporariamente indisponíveis.",{exact:false}).first()).toBeVisible();
+  expect(errors).toEqual([]);
+});
 
 test("ads, fairs and inline home search use the same marketplace structure", async ({
   page,
