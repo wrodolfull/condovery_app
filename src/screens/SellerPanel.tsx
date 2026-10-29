@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Alert, Pressable, ScrollView, Switch, View } from "react-native";
+import { Alert, AppState, Pressable, ScrollView, Switch, View } from "react-native";
 import { randomUUID } from "expo-crypto";
 import { useFocusEffect } from "expo-router";
 import { useAuth } from "../auth";
@@ -10,6 +10,8 @@ import { uploadPicture } from "../upload";
 import { allowedPaymentMethods, PAYMENT_LABELS, type PaymentMethod } from "../domain/payment-methods";
 import type { Product, Category, Order } from "../types";
 import type { OptionGroup } from "../domain/orders";
+import { sellerItemDetails, sellerOrderDetails } from "../domain/seller-orders";
+import { formatBRLInput, parseBRLInput } from "../domain/money-input";
 
 type Shop = {
   id:string; name:string; status:string; description:string; whatsapp:string;
@@ -51,6 +53,9 @@ export default function SellerPanel() {
   const [shop,setShop]=useState<Shop|null>(null);
   const [products,setProducts]=useState<Product[]>([]);
   const [orders,setOrders]=useState<Order[]>([]);
+  const [ordersLoading,setOrdersLoading]=useState(false);
+  const [ordersError,setOrdersError]=useState("");
+  const [lastOrdersUpdate,setLastOrdersUpdate]=useState<Date|null>(null);
   const [reviews,setReviews]=useState<Review[]>([]);
   const [categories,setCategories]=useState<Category[]>([]);
   const [insight,setInsight]=useState<Insight|null>(null);
@@ -61,6 +66,7 @@ export default function SellerPanel() {
   const [noticeTitle,setNoticeTitle]=useState(""),[noticeBody,setNoticeBody]=useState("");
   const [deletion,setDeletion]=useState("");
   const [form,setForm]=useState<ShopForm>(defaultShop);
+  const [optionPriceDrafts,setOptionPriceDrafts]=useState<Record<string,string>>({});
   const [productForm,setProductForm]=useState<{
     id:string;name:string;description:string;category_id:string;price:string;promo:string;
     stock:string;image_url:string;visibility:Product["visibility"];lead_time:string;option_groups:OptionGroup[];
@@ -81,15 +87,35 @@ export default function SellerPanel() {
     finally{setLoading(false);}
   },[api]);
   useFocusEffect(useCallback(()=>{void reload();},[reload]));
+  // Poll only while the seller is viewing orders. A new sale must not require
+  // leaving the screen to become visible; never label a failed request "empty".
+  useFocusEffect(useCallback(()=>{
+    if(tab!=="Pedidos"||!shop?.id)return;
+    let active=true;
+    const load=async(initial:boolean)=>{
+      if(initial){setOrdersLoading(true);setOrdersError("");}
+      try{
+        const r=await api.request<{orders:Order[]}>("orders?scope=seller");
+        if(active){setOrders(r.orders);setOrdersError("");setLastOrdersUpdate(new Date());}
+      }catch(e){if(active)setOrdersError((e as Error).message);}
+      finally{if(active&&initial)setOrdersLoading(false);}
+    };
+    void load(true);
+    // Do not poll while the app is backgrounded; refresh when it resumes.
+    const timer=setInterval(()=>{
+      if(AppState.currentState==="active")void load(false);
+    },20000);
+    const subscription=AppState.addEventListener("change",state=>{
+      if(state==="active")void load(false);
+    });
+    return ()=>{active=false;clearInterval(timer);subscription.remove();};
+  },[api,shop?.id,tab]));
   useEffect(()=>{
     if(!shop)return;
     let active=true;
     const task=async()=>{
       try {
-        if(tab==="Pedidos"){
-          const r=await api.request<{orders:Order[]}>("orders?scope=seller");
-          if(active)setOrders(r.orders);
-        }else if(tab==="Avaliações"){
+        if(tab==="Avaliações"){
           const r=await api.request<{reviews:Review[]}>("shops/mine/reviews");
           if(active)setReviews(r.reviews);
         }else if(tab==="Resultados"){
@@ -110,14 +136,17 @@ export default function SellerPanel() {
     catch(e){setError((e as Error).message);}
     finally{setBusy(false);}
   }
-  const newProduct=()=>setProductForm({id:"",name:"",description:"",category_id:categories[0]?.id??"",
-    price:"",promo:"",stock:"",image_url:"",visibility:"available",lead_time:"",option_groups:[]});
-  const editProduct=(p:Product)=>setProductForm({id:p.id,name:p.name,description:p.description,
-    category_id:p.category_id,price:String(p.price_cents/100),
-    promo:p.promo_price_cents==null?"":String(p.promo_price_cents/100),
+  const newProduct=()=>{setOptionPriceDrafts({});setProductForm({id:"",name:"",description:"",category_id:categories[0]?.id??"",
+    price:"",promo:"",stock:"",image_url:"",visibility:"available",lead_time:"",option_groups:[]});};
+  const editProduct=(p:Product)=>{
+    setOptionPriceDrafts(Object.fromEntries((p.option_groups??[]).flatMap(group=>
+      group.options.map(option=>[option.id,formatBRLInput(option.price_cents)]))));
+    setProductForm({id:p.id,name:p.name,description:p.description,
+    category_id:p.category_id,price:formatBRLInput(p.price_cents),
+    promo:p.promo_price_cents==null?"":formatBRLInput(p.promo_price_cents),
     stock:p.stock==null?"":String(p.stock),image_url:p.image_url??"",
-    visibility:p.visibility,lead_time:p.lead_time??"",option_groups:p.option_groups??[]});
-  const cents=(v:string)=>Math.round(Number(v.replace(",", "."))*100);
+    visibility:p.visibility,lead_time:p.lead_time??"",option_groups:p.option_groups??[]});};
+
   const uploadEditorImage = async (target:"product"|"logo_image"|"cover_image") => {
     setBusy(true);setError("");
     try {
@@ -131,12 +160,25 @@ export default function SellerPanel() {
   const saveProduct=()=>run(async()=>{
     if(!productForm) return;
     const p=productForm;
-    if(!p.name.trim()||!p.category_id||!Number.isFinite(cents(p.price))||cents(p.price)<1)
-      throw new Error("Preencha nome, categoria e preço válido.");
+    const price=parseBRLInput(p.price);
+    const promo=p.promo.trim()?parseBRLInput(p.promo):null;
+    if(!p.name.trim()||!p.category_id||price===null||price<1)
+      throw new Error("Preencha nome, categoria e preço válido em reais (ex.: 19,90).");
+    if(p.promo.trim()&&(promo===null||promo<1||promo>=price))
+      throw new Error("O preço promocional deve ser válido e menor que o original.");
+    if(p.stock.trim()&&(!/^\d+$/.test(p.stock)||Number(p.stock)>100000))
+      throw new Error("Informe um estoque inteiro entre 0 e 100.000.");
+    const option_groups=p.option_groups.map(group=>({...group,
+      options:group.options.map(option=>{
+        const amount=parseBRLInput(optionPriceDrafts[option.id]??formatBRLInput(option.price_cents),1_000_000);
+        if(amount===null)throw new Error("Informe um preço adicional válido em reais (ex.: 2,50).");
+        return {...option,price_cents:amount};
+      }),
+    }));
     const data={name:p.name,description:p.description,category_id:p.category_id,
-      price_cents:cents(p.price),promo_price_cents:p.promo?cents(p.promo):null,
-      stock:p.stock?Number(p.stock):null,image_url:p.image_url||null,
-      visibility:p.visibility,lead_time:p.lead_time,option_groups:p.option_groups};
+      price_cents:price,promo_price_cents:promo,
+      stock:p.stock.trim()?Number(p.stock):null,image_url:p.image_url||null,
+      visibility:p.visibility,lead_time:p.lead_time,option_groups};
     await api.request(p.id?"products/"+p.id:"products",p.id?"PATCH":"POST",data);
     setProductForm(null);
   });
@@ -174,27 +216,53 @@ export default function SellerPanel() {
           <T bold style={{color:t===tab?"white":colors.ink}}>{t}</T>
         </Pressable>)}
       </ScrollView>
-      {tab==="Pedidos"&&(orders.length?orders.map(o=><View key={o.id} style={line}>
-        <T bold>Pedido #{o.code} · {money(o.total_cents)}</T>
-        <T>{o.status==="awaiting_confirmation"?"Aguardando confirmação":o.status==="confirmed"?"Confirmado":o.status==="completed"?"Concluído":"Cancelado"}</T>
-        <T>{o.tower} · Apto {o.apartment}</T>
-        {o.items.map((item,i)=><T key={i}>{item.quantity} × {item.name}</T>)}
-        {o.status==="awaiting_confirmation"&&<Button title="Confirmar pedido" busy={busy} onPress={()=>void run(async()=>{
-          await api.request("orders/"+o.id,"PATCH",{status:"confirmed"});
-          const x=await api.request<{orders:Order[]}>("orders?scope=seller");setOrders(x.orders);
-        })}/>}
-        {o.status==="confirmed"&&<Button title="Concluir pedido" busy={busy} onPress={()=>void run(async()=>{
-          await api.request("orders/"+o.id,"PATCH",{status:"completed"});
-          const x=await api.request<{orders:Order[]}>("orders?scope=seller");setOrders(x.orders);
-        })}/>}
-        {["awaiting_confirmation","confirmed"].includes(o.status)&&
-          <Button title="Cancelar pedido" secondary busy={busy} onPress={()=>Alert.alert("Cancelar pedido?","Esta ação altera o status do pedido.",[
-            {text:"Voltar",style:"cancel"},
-            {text:"Cancelar pedido",style:"destructive",onPress:()=>void run(async()=>{
-              await api.request("orders/"+o.id,"PATCH",{status:"cancelled"});
-              const x=await api.request<{orders:Order[]}>("orders?scope=seller");setOrders(x.orders);
-            })}])}/>}
-      </View>):<Empty title="Nenhum pedido recebido" body="Os pedidos da sua loja aparecerão aqui."/>)}
+      {tab==="Pedidos"&&<View style={{gap:12}}>
+        <View style={{flexDirection:"row",alignItems:"center",justifyContent:"space-between",gap:10}}>
+          <T style={{color:colors.muted,fontSize:12}}>
+            {lastOrdersUpdate?"Atualizado às "+lastOrdersUpdate.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}):"Aguardando pedidos"}
+          </T>
+          <Button title="Atualizar" secondary busy={ordersLoading} onPress={()=>{
+            setOrdersLoading(true);
+            void api.request<{orders:Order[]}>("orders?scope=seller")
+              .then(r=>{setOrders(r.orders);setOrdersError("");setLastOrdersUpdate(new Date());})
+              .catch(e=>setOrdersError((e as Error).message))
+              .finally(()=>setOrdersLoading(false));
+          }}/>
+        </View>
+        {!!ordersError&&<ErrorBox message={"Não foi possível atualizar os pedidos: "+ordersError}/>}
+        {ordersLoading&&!lastOrdersUpdate?<Loading/>:
+          !ordersError&&!orders.length?<Empty title="Nenhum pedido recebido" body="Os pedidos da sua loja aparecerão aqui."/>:
+          orders.map(o=><View key={o.id} style={line}>
+            <T bold style={{fontSize:17}}>Pedido #{o.code}</T>
+            <T bold>{o.status==="awaiting_confirmation"?"Aguardando confirmação":o.status==="confirmed"?"Confirmado":o.status==="completed"?"Concluído":"Cancelado"}</T>
+            {sellerOrderDetails(o).map((detail,i)=><T key={"detail-"+i}>{detail}</T>)}
+            <T bold>Itens do pedido</T>
+            {o.items.map((item,i)=><View key={i} style={{gap:4,paddingVertical:7,borderTopWidth:1,borderColor:colors.line}}>
+              <T bold>{item.quantity} × {item.name} · {money(item.unit_price_cents*item.quantity)}</T>
+              {sellerItemDetails(item).map((detail,j)=><T key={j} style={{color:colors.muted}}>{detail}</T>)}
+            </View>)}
+            <View style={{borderTopWidth:1,borderColor:colors.line,paddingTop:9,gap:4}}>
+              <T>Subtotal: {money(o.subtotal_cents??o.total_cents)}</T>
+              {o.fulfillment==="delivery"&&<T>Taxa de entrega: {money(o.delivery_fee_cents??0)}</T>}
+              <T bold>Total: {money(o.total_cents)}</T>
+            </View>
+            {o.status==="awaiting_confirmation"&&<Button title="Confirmar pedido" busy={busy} onPress={()=>void run(async()=>{
+              await api.request("orders/"+o.id,"PATCH",{status:"confirmed"});
+              const x=await api.request<{orders:Order[]}>("orders?scope=seller");setOrders(x.orders);setLastOrdersUpdate(new Date());
+            })}/>}
+            {o.status==="confirmed"&&<Button title="Concluir pedido" busy={busy} onPress={()=>void run(async()=>{
+              await api.request("orders/"+o.id,"PATCH",{status:"completed"});
+              const x=await api.request<{orders:Order[]}>("orders?scope=seller");setOrders(x.orders);setLastOrdersUpdate(new Date());
+            })}/>}
+            {["awaiting_confirmation","confirmed"].includes(o.status)&&
+              <Button title="Cancelar pedido" secondary busy={busy} onPress={()=>Alert.alert("Cancelar pedido?","Esta ação altera o status do pedido.",[
+                {text:"Voltar",style:"cancel"},
+                {text:"Cancelar pedido",style:"destructive",onPress:()=>void run(async()=>{
+                  await api.request("orders/"+o.id,"PATCH",{status:"cancelled"});
+                  const x=await api.request<{orders:Order[]}>("orders?scope=seller");setOrders(x.orders);setLastOrdersUpdate(new Date());
+                })}])}/>}
+          </View>)}
+      </View>}
       {tab==="Produtos"&&(productForm?<Card>
         <T heading style={{fontSize:21}}>{productForm.id?"Editar produto":"Novo produto"}</T>
         <Field label="Nome" value={productForm.name} onChangeText={v=>setProductForm(p=>p?{...p,name:v}:p)}/>
@@ -227,11 +295,9 @@ export default function SellerPanel() {
             <Field label={"Opção "+(oi+1)} value={o.name} onChangeText={v=>setProductForm(p=>p?{
               ...p,option_groups:p.option_groups.map(x=>x.id===g.id?{...x,options:x.options.map(a=>a.id===o.id?{...a,name:v}:a)}:x)
             }:p)}/>
-            <Field label="Adicional (centavos)" keyboardType="number-pad" value={String(o.price_cents)}
-              onChangeText={v=>setProductForm(p=>p?{
-                ...p,option_groups:p.option_groups.map(x=>x.id===g.id?{...x,
-                  options:x.options.map(a=>a.id===o.id?{...a,price_cents:Number(v.replace(/\D/g,""))||0}:a)}:x)
-              }:p)}/>
+            <Field label="Preço adicional (R$)" keyboardType="decimal-pad"
+              value={optionPriceDrafts[o.id]??formatBRLInput(o.price_cents)}
+              onChangeText={v=>setOptionPriceDrafts(previous=>({...previous,[o.id]:v}))}/>
             <Button title="Remover opção" secondary disabled={g.options.length<=1}
               onPress={()=>setProductForm(p=>p?{...p,
                 option_groups:p.option_groups.map(x=>x.id===g.id?{...x,options:x.options.filter(a=>a.id!==o.id)}:x)
@@ -323,9 +389,11 @@ export default function SellerPanel() {
             })},
           ])}/>
         <Button title="Salvar configurações" busy={busy} onPress={()=>void run(async()=>{
+          const fee=parseBRLInput(form.delivery_fee_cents,1_000_000);
+          if(fee===null)throw new Error("Informe uma taxa de entrega válida em reais.");
           await api.request("shops/mine","PATCH",{
             ...form,logo_image:form.logo_image||null,cover_image:form.cover_image||null,
-            delivery_fee_cents:cents(form.delivery_fee_cents),
+            delivery_fee_cents:fee,
           });
         })}/>
         <T heading style={{fontSize:21}}>Excluir minha loja</T>
