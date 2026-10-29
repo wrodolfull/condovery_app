@@ -122,6 +122,7 @@ async function enter(page: Page, withAds = true, withFairs = true, extendedCatal
   const errors: string[] = [],
     impressions: string[] = [];
   let favoriteIds: string[] = [];
+  let savedShopIds: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   const image = await readFile("assets/icon.png");
   await page.route("https://condovery.example/api/**", async (route) => {
@@ -179,6 +180,16 @@ async function enter(page: Page, withAds = true, withFairs = true, extendedCatal
         ids: favoriteIds,
         products: products.filter((p) => favoriteIds.includes(p.id)),
       };
+    else if (endpoint === "favorite-shops" && request.method() === "GET")
+      value = { ids: savedShopIds, shops: savedShopIds.includes(shop.id) ? [shop] : [] };
+    else if (endpoint === "favorite-shops" && request.method() === "POST") {
+      const shopId = request.postDataJSON().shop_id;
+      if (shopId === shop.id && !savedShopIds.includes(shopId)) savedShopIds.push(shopId);
+      value = { ok: true, saved: true };
+    } else if (endpoint === "favorite-shops/" + shop.id && request.method() === "DELETE") {
+      savedShopIds = savedShopIds.filter((saved) => saved !== shop.id);
+      value = { ok: true, saved: false };
+    }
     else if (endpoint === "ads")
       value = { campaigns: withAds ? campaigns : [] };
     else if (/^ads\/[^/]+\/impression$/.test(endpoint)) {
@@ -315,8 +326,20 @@ for (const width of [360, 390, 430]) {
         exact: true,
       }),
     ).toBeVisible();
+    // Native and web use the same bookmark API; ensure new store actions
+    // preserve buyer navigation and appear under Salvos at every viewport.
+    await expect(page.getByText("Ofertas", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Salvar loja", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Remover loja dos salvos" })).toBeVisible();
     await page.getByRole("tab", { name: "Salvos", exact: true }).click();
     await checkNav(page, "Salvos");
+    await expect(page.getByText("Lojas salvas", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Ver loja Loja do Vizinho" })).toBeVisible();
+    await page.getByRole("button", { name: "Ver loja Loja do Vizinho" }).click();
+    await page.getByRole("button", { name: "Remover loja dos salvos" }).click();
+    await page.getByRole("tab", { name: "Salvos", exact: true }).click();
+    await expect(page.getByText("Lojas salvas", { exact: true })).toHaveCount(0);
+    await checkNav(page,"Salvos");
     await expect(page.getByRole("button", { name: "Ver Bolo de cenoura", exact: true }).filter({ visible: true })).toHaveCount(1);
     await page.getByRole("button", { name: "Remover dos favoritos", exact: true }).filter({ visible: true }).click();
     await expect(page.getByText("Seu próximo favorito mora aqui", { exact: true })).toBeVisible();
