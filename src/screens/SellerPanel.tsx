@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Alert, Pressable, ScrollView, Switch, View } from "react-native";
+import { Alert, AppState, Pressable, ScrollView, Switch, View } from "react-native";
 import { randomUUID } from "expo-crypto";
 import { useFocusEffect } from "expo-router";
 import { useAuth } from "../auth";
@@ -101,8 +101,14 @@ export default function SellerPanel() {
       finally{if(active&&initial)setOrdersLoading(false);}
     };
     void load(true);
-    const timer=setInterval(()=>void load(false),20000);
-    return ()=>{active=false;clearInterval(timer);};
+    // Do not poll while the app is backgrounded; refresh when it resumes.
+    const timer=setInterval(()=>{
+      if(AppState.currentState==="active")void load(false);
+    },20000);
+    const subscription=AppState.addEventListener("change",state=>{
+      if(state==="active")void load(false);
+    });
+    return ()=>{active=false;clearInterval(timer);subscription.remove();};
   },[api,shop?.id,tab]));
   useEffect(()=>{
     if(!shop)return;
