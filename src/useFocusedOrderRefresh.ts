@@ -35,7 +35,3 @@ export function useFocusedOrderRefresh(
     };
   }, [key,poll]));
 }
-
-export function orderNeedsLiveRefresh(status: string | undefined): boolean {
-  return !status || status === "awaiting_confirmation" || status === "confirmed";
-}
