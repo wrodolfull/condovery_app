@@ -34,7 +34,7 @@ type AccountLink = {
 export function Account() {
   const auth = useAuth();
   const viewer = auth.viewer;
-  const webPanel = () => void openWeb(auth.api.web("/?painel=vendedor")).catch(alertError);
+  const webPanel = () => router.push("/vendedor");
   const logout = () =>
     Alert.alert(
       "Sair da conta?",
@@ -53,7 +53,7 @@ export function Account() {
     },
     {
       label: "Minha loja / Quero vender",
-      description: "Gerencie sua loja no navegador",
+      description: "Gerencie sua loja e seus pedidos no aplicativo",
       icon: <Store size={22} color={colors.ink} />,
       onPress: webPanel,
     },
