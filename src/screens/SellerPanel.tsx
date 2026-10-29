@@ -202,6 +202,13 @@ export default function SellerPanel() {
     catch(e){setError((e as Error).message);}
     finally{setBusy(false);}
   }
+  const moderateReview=(id:string,status:"approved"|"rejected")=>{
+    void run(async()=>{
+      await api.request("shops/mine/reviews/"+id,"PATCH",{status});
+      const response=await api.request<{reviews:Review[]}>("shops/mine/reviews");
+      setReviews(response.reviews);
+    });
+  };
   const newProduct=()=>{setOptionPriceDrafts({});setProductForm({id:"",name:"",description:"",category_id:categories[0]?.id??"",
     price:"",promo:"",stock:"",image_url:"",visibility:"available",lead_time:"",option_groups:[]});};
   const editProduct=(p:Product)=>{
@@ -418,8 +425,7 @@ export default function SellerPanel() {
         <T>{r.description}</T><T>{r.status==="pending"?"Aguardando moderação":r.status==="approved"?"Aprovada":"Recusada"}</T>
         {r.status==="pending"&&(["approved","rejected"] as const).map(status=>
           <Button key={status} title={status==="approved"?"Aprovar avaliação":"Rejeitar avaliação"} secondary busy={busy}
-            onPress={()=>void run(async()=>{await api.request("shops/mine/reviews/"+r.id,"PATCH",{status});
-              const v=await api.request<{reviews:Review[]}>("shops/mine/reviews");setReviews(v.reviews);})}/>)}
+            onPress={()=>moderateReview(r.id,status)}/>)}
       </View>):<Empty title="Sem avaliações" body="As avaliações dos compradores aparecerão aqui."/>)}
       {tab==="Minha loja"&&<Card>
         <T heading style={{fontSize:21}}>Dados da loja</T>
