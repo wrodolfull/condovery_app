@@ -210,6 +210,7 @@ export function Checkout() {
           />
         </Card>
       )}
+      {shopClosed&&!cart.pending&&<Button title="Esvaziar carrinho" secondary onPress={()=>market.clear()}/>}
       <View style={{opacity:blocked?0.55:1}} pointerEvents={blocked?"none":"auto"}>
       {cart.items.map((i, index) => (
         <Card key={i.key}>
