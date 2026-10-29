@@ -120,18 +120,7 @@ test("registration and condominium lookup remain public while authenticated requ
 test("private images use bearer fetch and deduplicate requests without exposing tokens in URLs", async () => {
   const { loadPrivateMedia, clearPrivateMediaCache } = await import("../src/private-media");
   const originalFetch = globalThis.fetch;
-  const OriginalReader = globalThis.FileReader;
   const calls: { url: string; options: RequestInit }[] = [];
-  class Reader {
-    result: string | null = null;
-    onload: (() => void) | null = null;
-    onerror: (() => void) | null = null;
-    readAsDataURL() {
-      this.result = "data:image/png;base64,aGVsbG8=";
-      this.onload?.();
-    }
-  }
-  globalThis.FileReader = Reader as unknown as typeof FileReader;
   globalThis.fetch = async (input, options) => {
     calls.push({ url: String(input), options: options! });
     return new Response(new Blob(["hello"], { type: "image/png" }), {
@@ -159,7 +148,20 @@ test("private images use bearer fetch and deduplicate requests without exposing 
     assert.equal(calls.length, 1);
   } finally {
     clearPrivateMediaCache();
-    globalThis.FileReader = OriginalReader;
     globalThis.fetch = originalFetch;
   }
+});
+
+test("private image byte conversion handles padding and enforces MIME and size limits", async () => {
+  const { imageDataUri } = await import("../src/private-media");
+  const encode = (input: number[], mime = "image/png") =>
+    imageDataUri(Uint8Array.from(input).buffer, mime);
+  for (const bytes of [[], [0], [0, 1], [0, 1, 2], [255, 255, 255], [10, 20, 30, 40, 50]]) {
+    assert.equal(
+      encode(bytes),
+      "data:image/png;base64," + Buffer.from(bytes).toString("base64"),
+    );
+  }
+  assert.throws(() => encode([1], "text/html"), /inválida/);
+  assert.throws(() => imageDataUri(new ArrayBuffer(5 * 1024 * 1024 + 1), "image/jpeg"), /inválida/);
 });
