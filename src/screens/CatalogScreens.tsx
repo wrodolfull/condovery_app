@@ -28,7 +28,6 @@ import {
   House,
   Smartphone,
   ArrowRight,
-  Bell,
   Clock3,
   Share2,
   Heart,
@@ -799,9 +798,6 @@ export function ShopDetail() {
       created_at: string;
     }[];
   }>(shop ? "shops/" + shop.id + "/reviews" : null);
-  const subscription = useResource<{ subscribed: boolean }>(
-    shop ? "push/shops/" + shop.id : null,
-  );
   const savedShops = useResource<{ids:string[];shops:Shop[]}>(shop ? "favorite-shops" : null);
   const saved = !!shop && !!savedShops.data?.ids.includes(shop.id);
   const offers = (resource.data?.products ?? []).filter(p=>
@@ -950,43 +946,6 @@ export function ShopDetail() {
                 </T>
               </Pressable>
             </View>
-            <Pressable
-              accessibilityRole="button"
-              disabled={subscription.loading || !!subscription.error}
-              onPress={() =>
-                void api
-                  .request(
-                    "push/shops/" + shop.id,
-                    subscription.data?.subscribed ? "DELETE" : "PUT",
-                  )
-                  .then(() => subscription.reload())
-                  .catch(alertError)
-              }
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 7,
-                alignSelf: "flex-start",
-                minHeight: 39,
-                borderRadius: 99,
-                borderWidth: 1,
-                borderColor: colors.line,
-                paddingVertical: 9,
-                paddingHorizontal: 13,
-                opacity: subscription.loading ? 0.5 : 1,
-              }}
-            >
-              <Bell size={16} color={colors.ink} />
-              <T bold style={{ fontSize: 12, flexShrink: 1 }}>
-                {subscription.data?.subscribed
-                  ? "Desativar avisos desta loja"
-                  : "Receber avisos desta loja"}
-              </T>
-            </Pressable>
-            <ErrorBox
-              message={subscription.error}
-              retry={() => void subscription.reload().catch(() => {})}
-            />
           </View>
           <View
             accessibilityLabel="Avaliação da loja"
