@@ -101,7 +101,7 @@ export class ApiClient {
   }
   /** Native multipart upload. React Native's XHR transports file:// FormData
    * reliably on Android, without serializing the file as JSON or exposing credentials. */
-  upload<T>(path: "media/profile" | "media/giveaway", form: FormData): Promise<T> {
+  upload<T>(path: "media/profile" | "media/giveaway" | "media", form: FormData): Promise<T> {
     if (!this.token || !this.origin)
       return Promise.reject(new Error("Entre na sua conta antes de enviar uma imagem."));
     return new Promise<T>((resolve, reject) => {
