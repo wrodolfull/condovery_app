@@ -1,7 +1,7 @@
 import React from "react";
 import { Linking, Modal, Pressable, ScrollView, Share, View } from "react-native";
 import * as Clipboard from "expo-clipboard";
-import { Facebook, Instagram, Link2, Mail, MessageCircle, MoreHorizontal, Send, Share2, X } from "lucide-react-native";
+import { Camera, Link2, Mail, MessageCircle, MoreHorizontal, Send, X } from "lucide-react-native";
 import { colors } from "../theme";
 import { T, alertError } from "../ui";
 
@@ -15,13 +15,13 @@ export function ShopShareSheet({ visible, onClose, shopName, url }: Props) {
   const options = [
     {name:"WhatsApp", color:"#25C565", icon:<MessageCircle size={26} color="white"/>,
       action:()=>launch("https://wa.me/?text="+encodeURIComponent(message))},
-    {name:"Facebook",color:"#5178BE",icon:<Facebook size={26} color="white"/>,
+    {name:"Facebook",color:"#5178BE",icon:<T bold style={{fontSize:31,color:"white"}}>f</T>,
       action:()=>launch("https://www.facebook.com/sharer/sharer.php?u="+encodeURIComponent(url))},
     {name:"X",color:"#111111",icon:<T bold style={{fontSize:24,color:"white"}}>X</T>,
       action:()=>launch("https://twitter.com/intent/tweet?text="+encodeURIComponent(message))},
     {name:"Telegram",color:"#2BA7D7",icon:<Send size={26} color="white"/>,
       action:()=>launch("https://t.me/share/url?url="+encodeURIComponent(url)+"&text="+encodeURIComponent("Conheça esta loja!"))},
-    {name:"Instagram",color:"#C2529E",icon:<Instagram size={26} color="white"/>,
+    {name:"Instagram",color:"#C2529E",icon:<Camera size={26} color="white"/>,
       action:nativeShare},
     {name:"SMS",color:"#37C36D",icon:<MessageCircle size={26} color="white"/>,
       action:()=>launch("sms:?body="+encodeURIComponent(message))},
