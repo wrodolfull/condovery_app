@@ -421,11 +421,12 @@ test("the weekly offer artwork is the fallback when there are no ads", async ({
   expect(errors).toEqual([]);
 });
 
-test("absence of fairs and advertisements shows useful native fallbacks", async ({
+test("absence of fairs hides the section while ads keep their fallback", async ({
   page,
 }) => {
   const { errors } = await enter(page, false, false);
-  await expect(page.getByText("Nenhuma feira acontecendo agora")).toBeVisible();
+  await expect(page.getByText("Feiras da vizinhança")).toHaveCount(0);
+  await expect(page.getByText("Nenhuma feira acontecendo agora")).toHaveCount(0);
   await expect(page.getByText("Ofertas da semana", { exact: true })).toBeVisible();
   await expect(page.getByText("PUBLICIDADE", { exact: true })).toHaveCount(0);
   expect(errors).toEqual([]);

@@ -116,3 +116,50 @@ test("registration and condominium lookup remain public while authenticated requ
     globalThis.fetch = original;
   }
 });
+
+test("private images use bearer fetch and deduplicate requests without exposing tokens in URLs", async () => {
+  const { loadPrivateMedia, clearPrivateMediaCache } = await import("../src/private-media");
+  const originalFetch = globalThis.fetch;
+  const OriginalReader = globalThis.FileReader;
+  const calls: { url: string; options: RequestInit }[] = [];
+  class Reader {
+    result: string | null = null;
+    onload: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    readAsDataURL() {
+      this.result = "data:image/png;base64,aGVsbG8=";
+      this.onload?.();
+    }
+  }
+  globalThis.FileReader = Reader as unknown as typeof FileReader;
+  globalThis.fetch = async (input, options) => {
+    calls.push({ url: String(input), options: options! });
+    return new Response(new Blob(["hello"], { type: "image/png" }), {
+      headers: { "content-type": "image/png" },
+    });
+  };
+  try {
+    const url = "https://condovery.example/api/media/771e965c-5e32-40aa-b2f1-11cc208260f8?account=buyer";
+    const token = "a".repeat(64);
+    const [one, two] = await Promise.all([
+      loadPrivateMedia(url, token), loadPrivateMedia(url, token),
+    ]);
+    assert.equal(one, two);
+    assert.equal(await loadPrivateMedia(url, token), one);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, url);
+    assert.equal(
+      (calls[0].options.headers as Record<string, string>).Authorization,
+      "Bearer " + token,
+    );
+    assert.equal(calls[0].options.credentials, "omit");
+    assert.equal(calls[0].options.redirect, "error");
+    await assert.rejects(() => loadPrivateMedia("https://external.example/pic.png", token), /inválida/);
+    await assert.rejects(() => loadPrivateMedia(url, "bad"), /inválida/);
+    assert.equal(calls.length, 1);
+  } finally {
+    clearPrivateMediaCache();
+    globalThis.FileReader = OriginalReader;
+    globalThis.fetch = originalFetch;
+  }
+});

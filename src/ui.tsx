@@ -1,8 +1,10 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { loadPrivateMedia } from "./private-media";
 import {
   ActivityIndicator,
   Image,
   Pressable,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -370,8 +372,24 @@ export function Picture({
 }) {
   const { viewer, api } = useAuth();
   const source = api.image(path, viewer?.id ?? "");
+  const sourceUri = source?.uri ?? "";
+  const token = source?.headers.Authorization?.replace(/^Bearer /, "") ?? "";
+  const [resolved, setResolved] = useState<{ key: string; uri: string | null } | null>(null);
   const [failedUri, setFailedUri] = useState<string | null>(null);
-  const failed = !!source && failedUri === source.uri;
+  useEffect(() => {
+    if (Platform.OS === "web" || !sourceUri || !token) return;
+    let mounted = true;
+    void loadPrivateMedia(sourceUri, token).then(
+      (uri) => { if (mounted) setResolved({ key: sourceUri, uri }); },
+      () => { if (mounted) setResolved({ key: sourceUri, uri: null }); },
+    );
+    return () => { mounted = false; };
+  }, [sourceUri, token]);
+  const displayUri = Platform.OS === "web"
+    ? sourceUri
+    : resolved?.key === sourceUri ? resolved.uri : null;
+  const failed = (Platform.OS === "web" && failedUri === sourceUri) ||
+    (Platform.OS !== "web" && resolved?.key === sourceUri && !resolved.uri);
   const shape = {
     width: "100%" as const,
     ...(aspectRatio ? { aspectRatio } : { height }),
@@ -379,11 +397,11 @@ export function Picture({
     overflow: "hidden" as const,
     backgroundColor: "#EEE8DC",
   };
-  return source && !failed ? (
+  return source && displayUri && !failed ? (
     <Image
       onError={() => setFailedUri(source.uri)}
       accessibilityLabel={label}
-      source={source}
+      source={Platform.OS === "web" ? source : { uri: displayUri }}
       style={shape}
       resizeMode="cover"
     />

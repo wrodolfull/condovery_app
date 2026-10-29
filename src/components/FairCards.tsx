@@ -32,26 +32,7 @@ export function FairArt({ fair }: { fair: CommunityFair }) {
 }
 export function FairHomeTeaser() {
   const { data } = useResource<{ fairs: CommunityFair[] }>("fairs");
-  if (!data) return null;
-  if (!data.fairs.length)
-    return (
-      <View accessibilityLabel="Feiras do condomínio" style={{ gap: 12 }}>
-        <T heading style={{ fontSize: 21 }}>Feiras da vizinhança</T>
-        <View style={{
-          backgroundColor: "white", borderWidth: 1, borderColor: "#EEEEEE",
-          borderRadius: 14, padding: 20, flexDirection: "row",
-          alignItems: "center", gap: 12,
-        }}>
-          <Gift size={27} color="#A67B42" />
-          <View style={{ flex: 1, gap: 3 }}>
-            <T bold>Nenhuma feira acontecendo agora</T>
-            <T style={{ color: "#626262", fontSize: 12 }}>
-              Quando uma nova feira for publicada, você poderá conhecê-la por aqui.
-            </T>
-          </View>
-        </View>
-      </View>
-    );
+  if (!data?.fairs.length) return null;
   return (
     <View accessibilityLabel="Feiras do condomínio" style={{ gap: 12 }}>
       <View
