@@ -1,7 +1,7 @@
 import { quoteChanged } from "../domain/quote";
 import { dateForApi } from "../domain/date";
 import React, { useState } from "react";
-import { Pressable, RefreshControl, View } from "react-native";
+import { FlatList, Pressable, View, useWindowDimensions } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { randomUUID } from "expo-crypto";
 import { useAuth } from "../auth";
@@ -335,75 +335,82 @@ export function Checkout() {
 }
 export function Orders() {
   const [status, setStatus] = useState("");
+  const { width } = useWindowDimensions();
   const r = useResource<{ orders: Order[] }>(
     "orders" + (status ? "?status=" + status : ""),
   );
   return (
-    <Screen
-      title="Meus pedidos"
-      refreshControl={
-        <RefreshControl
-          refreshing={r.loading}
-          onRefresh={() => void r.reload().catch(() => {})}
-        />
-      }
-    >
-      <T heading style={{ fontSize: 28 }}>
-        Meus pedidos
-      </T>
-      <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
-        {[
-          ["", "Todos"],
-          ["awaiting_confirmation", "Criados"],
-          ["confirmed", "Confirmados"],
-          ["completed", "Concluídos"],
-          ["cancelled", "Cancelados"],
-        ].map(([key, label]) => (
+    <Screen title="Meus pedidos" scrollable={false}>
+      <FlatList
+        accessibilityLabel="Lista de pedidos"
+        data={r.data?.orders ?? []}
+        keyExtractor={(item) => item.id}
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        windowSize={5}
+        refreshing={!!r.loading && !!r.data}
+        onRefresh={() => void r.reload().catch(() => {})}
+        contentContainerStyle={{
+          paddingHorizontal: width <= 420 ? 15 : 20,
+          paddingTop: width <= 420 ? 20 : 24,
+          paddingBottom: 180,
+          gap: 15,
+        }}
+        ListHeaderComponent={
+          <View style={{ gap: 16 }}>
+            <T heading style={{ fontSize: 28 }}>Meus pedidos</T>
+            <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+              {[
+                ["", "Todos"],
+                ["awaiting_confirmation", "Criados"],
+                ["confirmed", "Confirmados"],
+                ["completed", "Concluídos"],
+                ["cancelled", "Cancelados"],
+              ].map(([key, label]) => (
+                <Pressable
+                  key={key}
+                  onPress={() => setStatus(key)}
+                  style={{
+                    backgroundColor: key === status ? colors.yellow : "white",
+                    padding: 10,
+                    borderRadius: 22,
+                  }}
+                >
+                  <T bold style={{ fontSize: 12 }}>{label}</T>
+                </Pressable>
+              ))}
+            </View>
+            <ErrorBox
+              message={r.error}
+              retry={() => void r.reload().catch(() => {})}
+            />
+          </View>
+        }
+        ListEmptyComponent={
+          r.loading ? <Loading /> : r.error ? null : (
+            <Empty
+              title="Seus pedidos aparecerão aqui"
+              body="Explore as lojas do seu condomínio para começar."
+            />
+          )
+        }
+        renderItem={({ item: o }) => (
           <Pressable
-            key={key}
-            onPress={() => setStatus(key)}
-            style={{
-              backgroundColor: key === status ? colors.yellow : "white",
-              padding: 10,
-              borderRadius: 22,
-            }}
+            onPress={() =>
+              router.push({ pathname: "/pedido/[id]", params: { id: o.id } })
+            }
           >
-            <T bold style={{ fontSize: 12 }}>
-              {label}
-            </T>
+            <Card>
+              <T bold>Pedido #{o.code} · {o.shop_name}</T>
+              <T>{statusLabels[o.status] ?? o.status}</T>
+              <T bold>{money(o.total_cents)}</T>
+              <T style={{ fontSize: 12, color: colors.muted }}>
+                {new Date(o.created_at).toLocaleString("pt-BR")}
+              </T>
+            </Card>
           </Pressable>
-        ))}
-      </View>
-      <ErrorBox
-        message={r.error}
-        retry={() => void r.reload().catch(() => {})}
+        )}
       />
-      {r.loading && <Loading />}
-      {r.data?.orders.map((o) => (
-        <Pressable
-          key={o.id}
-          onPress={() =>
-            router.push({ pathname: "/pedido/[id]", params: { id: o.id } })
-          }
-        >
-          <Card>
-            <T bold>
-              Pedido #{o.code} · {o.shop_name}
-            </T>
-            <T>{statusLabels[o.status] ?? o.status}</T>
-            <T bold>{money(o.total_cents)}</T>
-            <T style={{ fontSize: 12, color: colors.muted }}>
-              {new Date(o.created_at).toLocaleString("pt-BR")}
-            </T>
-          </Card>
-        </Pressable>
-      ))}
-      {r.data && !r.data.orders.length && (
-        <Empty
-          title="Seus pedidos aparecerão aqui"
-          body="Explore as lojas do seu condomínio para começar."
-        />
-      )}
     </Screen>
   );
 }
