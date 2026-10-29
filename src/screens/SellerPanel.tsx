@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Pressable, ScrollView, Switch, View } from "react-native";
+import { randomUUID } from "expo-crypto";
 import { useFocusEffect } from "expo-router";
 import { useAuth } from "../auth";
 import { Button, Card, Empty, ErrorBox, Field, Loading, Picture, Screen, T } from "../ui";
@@ -54,6 +55,8 @@ export default function SellerPanel() {
   const [applications,setApplications]=useState<FairApplication[]>([]);
   const [fairProducts,setFairProducts]=useState<{id:string;name:string}[]>([]);
   const [period,setPeriod]=useState<7|30|90>(30);
+  const [noticeTitle,setNoticeTitle]=useState(""),[noticeBody,setNoticeBody]=useState("");
+  const [deletion,setDeletion]=useState("");
   const [form,setForm]=useState<ShopForm>(defaultShop);
   const [productForm,setProductForm]=useState<{
     id:string;name:string;description:string;category_id:string;price:string;promo:string;
@@ -258,12 +261,38 @@ export default function SellerPanel() {
           <View style={{width:19,height:19,borderRadius:4,backgroundColor:form.payment_methods.includes(m)?colors.orange:"transparent",borderWidth:1,borderColor:colors.orange}}/>
           <T>{PAYMENT_LABELS[m]}</T>
         </Pressable>)}
+        <T heading style={{fontSize:21}}>Avisos da loja</T>
+        <T style={{color:colors.muted}}>Envie um comunicado aos moradores que acompanham sua loja e habilitaram notificações.</T>
+        <Field label="Título do aviso" maxLength={70} value={noticeTitle} onChangeText={setNoticeTitle}/>
+        <Field label="Mensagem" maxLength={240} multiline value={noticeBody} onChangeText={setNoticeBody}/>
+        <Button title="Publicar aviso" secondary busy={busy}
+          onPress={()=>Alert.alert("Publicar aviso?","Os moradores elegíveis receberão uma notificação.",[
+            {text:"Voltar",style:"cancel"},
+            {text:"Publicar",onPress:()=>void run(async()=>{
+              const result=await api.request<{recipients:number}>("shops/mine/push","POST",{
+                title:noticeTitle.trim(),body:noticeBody.trim(),client_key:randomUUID(),
+              });
+              setNoticeTitle("");setNoticeBody("");
+              setSuccess("Aviso publicado para "+result.recipients+" moradores.");
+            })},
+          ])}/>
         <Button title="Salvar configurações" busy={busy} onPress={()=>void run(async()=>{
           await api.request("shops/mine","PATCH",{
             ...form,logo_image:form.logo_image||null,cover_image:form.cover_image||null,
             delivery_fee_cents:Number(form.delivery_fee_cents),
           });
         })}/>
+        <T heading style={{fontSize:21}}>Excluir minha loja</T>
+        <T style={{color:colors.muted}}>Esta operação é irreversível. Pedidos em andamento precisam estar concluídos ou cancelados.</T>
+        <Field label="Digite EXCLUIR LOJA para confirmar" value={deletion} onChangeText={setDeletion}/>
+        <Button title="Excluir loja definitivamente" secondary busy={busy} disabled={deletion!=="EXCLUIR LOJA"}
+          onPress={()=>Alert.alert("Excluir loja definitivamente?","Os produtos deixarão de aparecer no marketplace.",[
+            {text:"Manter loja",style:"cancel"},
+            {text:"Excluir",style:"destructive",onPress:()=>void run(async()=>{
+              await api.request("shops/mine","DELETE",{confirmation:"EXCLUIR LOJA"});
+              setShop(null);setProducts([]);setDeletion("");
+            })},
+          ])}/>
       </Card>}
       {tab==="Resultados"&&<View style={{gap:14}}>
         <View style={{flexDirection:"row",gap:8}}>{([7,30,90] as const).map(n=><Pressable key={n} onPress={()=>setPeriod(n)}
