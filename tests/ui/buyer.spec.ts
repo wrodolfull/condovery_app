@@ -342,7 +342,7 @@ for (const width of [360, 390, 430]) {
     await checkNav(page,"Salvos");
     await expect(page.getByRole("button", { name: "Ver Bolo de cenoura", exact: true }).filter({ visible: true })).toHaveCount(1);
     await page.getByRole("button", { name: "Remover dos favoritos", exact: true }).filter({ visible: true }).click();
-    await expect(page.getByText("Seu próximo favorito mora aqui", { exact: true })).toBeVisible();
+    await expect(page.getByText("Seu próximo favorito mora aqui", { exact: true }).filter({ visible: true })).toBeVisible();
     await page.getByRole("tab", { name: "Pedidos", exact: true }).click();
     await checkNav(page, "Pedidos");
     await page.getByRole("tab", { name: "Conta", exact: true }).click();
