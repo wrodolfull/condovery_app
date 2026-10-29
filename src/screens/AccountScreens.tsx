@@ -36,7 +36,7 @@ export function Account() {
   const viewer = auth.viewer;
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
-  const webPanel = () => void openWeb(auth.api.web("/?painel=vendedor")).catch(alertError);
+  const webPanel = () => router.push("/vendedor");
   const logout = () => setLogoutOpen(true);
   const confirmLogout = async () => {
     if (loggingOut) return;
@@ -59,7 +59,7 @@ export function Account() {
     },
     {
       label: "Minha loja / Quero vender",
-      description: "Gerencie sua loja no navegador",
+      description: "Gerencie sua loja e seus pedidos no aplicativo",
       icon: <Store size={22} color={colors.ink} />,
       onPress: webPanel,
     },

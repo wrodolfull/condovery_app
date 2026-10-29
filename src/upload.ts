@@ -4,7 +4,7 @@ import * as ImageManipulator from "expo-image-manipulator";
 import type { ApiClient } from "./api";
 export async function uploadPicture(
   api: ApiClient,
-  kind: "profile" | "giveaway",
+  kind: "profile" | "giveaway" | "product" | "shop",
 ) {
   const picked = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ["images"],
@@ -46,7 +46,7 @@ export async function uploadPicture(
       name: "foto.jpg",
       type: "image/jpeg",
     } as unknown as Blob);
-  const route = kind === "profile" ? "media/profile" : "media/giveaway";
+  const route = kind === "profile" ? "media/profile" : kind === "giveaway" ? "media/giveaway" : "media";
   const r = Platform.OS === "web"
     ? await api.request<{ url: string }>(route, "POST", form)
     : await api.upload<{ url: string }>(route, form);
