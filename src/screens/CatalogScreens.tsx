@@ -665,6 +665,7 @@ export function Explore() {
 }
 export function Favorites() {
   const { favorites } = useMarket();
+  const savedShops = useResource<{ids:string[];shops:Shop[]}>("favorite-shops");
   const { width } = useWindowDimensions();
   const horizontal = width <= 420 ? 15 : 20;
   const productWidth = Math.max(0, (width - horizontal * 2 - 15) / 2);
@@ -688,16 +689,21 @@ export function Favorites() {
         ListHeaderComponent={
           <View style={{ gap: 12 }}>
             <T heading style={{ fontSize: 28 }}>Meus favoritos</T>
+            {!!savedShops.data?.shops.length && <View style={{gap:12}}>
+              <Section title="Lojas salvas"/>
+              {savedShops.data.shops.map(shop=><ShopRow key={shop.id} shop={shop}/>)}
+              <Section title="Produtos salvos"/>
+            </View>}
             <ErrorBox
-              message={favorites.error}
-              retry={() => void favorites.reload().catch(() => {})}
+              message={favorites.error || savedShops.error}
+              retry={() => void Promise.all([favorites.reload(),savedShops.reload()]).catch(() => {})}
             />
           </View>
         }
         ListEmptyComponent={
-          favorites.loading ? (
+          favorites.loading || savedShops.loading ? (
             <Loading />
-          ) : favorites.error ? null : (
+          ) : favorites.error || savedShops.error || !!savedShops.data?.shops.length ? null : (
             <Empty
               title="Seu próximo favorito mora aqui"
               body="Toque no coração de um produto para salvá-lo."
