@@ -12,6 +12,8 @@ import type { Product, Category, Order } from "../types";
 import type { OptionGroup } from "../domain/orders";
 import { sellerItemDetails, sellerOrderDetails } from "../domain/seller-orders";
 import { formatBRLInput, parseBRLInput } from "../domain/money-input";
+import {sellerDraftScope,parseSellerDraft,type ShopDraft} from "../domain/shop-draft";
+import {loadSellerDraft,saveSellerDraft} from "../storage";
 import { mergeLatestOrders, orderHistoryPath, type OrdersPage } from "../domain/order-pagination";
 
 type Shop = {
@@ -20,12 +22,7 @@ type Shop = {
   delivery_enabled:boolean; pickup_enabled:boolean; delivery_fee_cents:number;
   lead_time:string; pickup_instructions:string; payment_methods:PaymentMethod[];
 };
-type ShopForm = {
-  name:string; description:string; whatsapp:string; logo_image:string;
-  cover_image:string; is_open:boolean; delivery_enabled:boolean; pickup_enabled:boolean;
-  delivery_fee_cents:string; lead_time:string; pickup_instructions:string;
-  payment_methods:PaymentMethod[];
-};
+type ShopForm=ShopDraft;
 const defaultShop:ShopForm = {
   name:"",description:"",whatsapp:"",logo_image:"",cover_image:"",is_open:true,
   delivery_enabled:true,pickup_enabled:true,delivery_fee_cents:"0",
@@ -47,8 +44,22 @@ const tabs=["Pedidos","Produtos","Avaliações","Minha loja","Resultados","Feira
 type Tab=typeof tabs[number];
 const line={backgroundColor:"#FFFCF8",borderColor:"#E9E4DB",borderWidth:1,borderRadius:14,padding:14,gap:9} as const;
 
+function SellerReviewRows({reviews,busy,onModerate}:{reviews:Review[];busy:boolean;onModerate:(id:string,status:"approved"|"rejected")=>void}) {
+  if(!reviews.length)return <Empty title="Sem avaliações" body="As avaliações dos compradores aparecerão aqui."/>;
+  return <>{reviews.map(review=><View key={review.id} style={line}>
+    <T bold>Pedido #{review.order_code} · {review.rating}/5 estrelas</T>
+    <T>{review.description}</T>
+    <T>{review.status==="pending"?"Aguardando moderação":review.status==="approved"?"Aprovada":"Recusada"}</T>
+    {review.status==="pending"&&(["approved","rejected"] as const).map(status=>
+      <Button key={status} title={status==="approved"?"Aprovar avaliação":"Rejeitar avaliação"} secondary busy={busy}
+        onPress={()=>onModerate(review.id,status)}/>)}
+  </View>)}</>;
+}
+
 export default function SellerPanel() {
-  const {api}=useAuth();
+  const {api,viewer}=useAuth();
+  const ownerId=viewer?.id??'';
+  const condominiumId=viewer?.condominium_id??'';
   const market=useMarket();
   const [tab,setTab]=useState<Tab>("Pedidos");
   const [shop,setShop]=useState<Shop|null>(null);
@@ -70,6 +81,11 @@ export default function SellerPanel() {
   const [noticeTitle,setNoticeTitle]=useState(""),[noticeBody,setNoticeBody]=useState("");
   const [deletion,setDeletion]=useState("");
   const [form,setForm]=useState<ShopForm>(defaultShop);
+  const formRef=useRef<ShopForm>(defaultShop);
+  const draftScopeRef=useRef<string|null>(null);
+  const draftDirtyRef=useRef(false);
+  const [draftDirty,setDraftDirty]=useState(false);
+  const reloadRevision=useRef(0);
   const [optionPriceDrafts,setOptionPriceDrafts]=useState<Record<string,string>>({});
   const [productForm,setProductForm]=useState<{
     id:string;name:string;description:string;category_id:string;price:string;promo:string;
@@ -77,19 +93,48 @@ export default function SellerPanel() {
   }|null>(null);
   const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false);
   const [error,setError]=useState(""),[success,setSuccess]=useState("");
-  const updateForm=(key:keyof ShopForm,value:ShopForm[keyof ShopForm])=>
-    setForm(v=>({...v,[key]:value}));
+  const updateForm=(key:keyof ShopForm,value:ShopForm[keyof ShopForm])=>{
+    const next={...formRef.current,[key]:value};
+    formRef.current=next;setForm(next);
+    const scope=draftScopeRef.current;
+    if(scope){
+      draftDirtyRef.current=true;setDraftDirty(true);
+      void saveSellerDraft(scope,next).catch(()=>setError("Não foi possível guardar o rascunho neste dispositivo."));
+    }
+  };
+  const clearShopDraft=async()=>{
+    const scope=draftScopeRef.current;
+    if(scope)await saveSellerDraft(scope,null);
+    draftDirtyRef.current=false;setDraftDirty(false);
+  };
   const reload=useCallback(async()=>{
+    const revision=++reloadRevision.current;
     setError("");
     try {
       const result=await api.request<{shop:Shop|null;products:Product[]}>("shops/mine");
+      const scope=sellerDraftScope(ownerId,condominiumId,result.shop?.id??null);
+      const changed=scope!==draftScopeRef.current;
+      const saved=changed?parseSellerDraft(await loadSellerDraft(scope)):null;
+      if(revision!==reloadRevision.current)return;
       setShop(result.shop);setProducts(result.products);
-      if(result.shop)setForm(fromShop(result.shop));
+      const server=result.shop?fromShop(result.shop):defaultShop;
+      if(changed){
+        draftScopeRef.current=scope;
+        draftDirtyRef.current=!!saved;setDraftDirty(!!saved);
+        const next=saved?{...saved,is_open:server.is_open}:server;
+        formRef.current=next;setForm(next);
+      }else if(!draftDirtyRef.current){
+        formRef.current=server;setForm(server);
+      }else if(result.shop && formRef.current.is_open!==result.shop.is_open){
+        const next={...formRef.current,is_open:result.shop.is_open};
+        formRef.current=next;setForm(next);
+        void saveSellerDraft(scope,next);
+      }
       const home=await api.request<{categories:Category[]}>("home");
-      setCategories(home.categories);
-    }catch(e){setError((e as Error).message);}
-    finally{setLoading(false);}
-  },[api]);
+      if(revision===reloadRevision.current)setCategories(home.categories);
+    }catch(e){if(revision===reloadRevision.current)setError((e as Error).message);}
+    finally{if(revision===reloadRevision.current)setLoading(false);}
+  },[api,ownerId,condominiumId]);
   useFocusEffect(useCallback(()=>{void reload();},[reload]));
   // The seller sees fresh orders while this tab is active, without losing
   // historical pages they explicitly loaded. Cursor remains anchored to the
@@ -169,6 +214,13 @@ export default function SellerPanel() {
     catch(e){setError((e as Error).message);}
     finally{setBusy(false);}
   }
+  const moderateReview=(id:string,status:"approved"|"rejected")=>{
+    void run(async()=>{
+      await api.request("shops/mine/reviews/"+id,"PATCH",{status});
+      const response=await api.request<{reviews:Review[]}>("shops/mine/reviews");
+      setReviews(response.reviews);
+    });
+  };
   const newProduct=()=>{setOptionPriceDrafts({});setProductForm({id:"",name:"",description:"",category_id:categories[0]?.id??"",
     price:"",promo:"",stock:"",image_url:"",visibility:"available",lead_time:"",option_groups:[]});};
   const editProduct=(p:Product)=>{
@@ -186,7 +238,10 @@ export default function SellerPanel() {
       const url=await uploadPicture(api,target==="product"?"product":"shop");
       if(!url)return;
       if(target==="product")setProductForm(p=>p?{...p,image_url:url}:p);
-      else updateForm(target,url);
+      else {
+         updateForm(target,url);
+         setSuccess("Imagem pronta. Salve as configurações para publicá-la.");
+       }
     }catch(e){setError((e as Error).message);}
     finally{setBusy(false);}
   };
@@ -222,6 +277,7 @@ export default function SellerPanel() {
     {!!success&&<T style={{color:colors.green}}>{success}</T>}
     {loading?<Loading/>:!shop?<Card>
       <T heading style={{fontSize:22}}>Comece a vender</T>
+      {draftDirty&&<T style={{color:colors.muted}}>Cadastro em rascunho: os campos preenchidos foram guardados neste dispositivo.</T>}
       <T>Cadastre sua loja para vender aos vizinhos do condomínio.</T>
       <Field label="Nome da loja" value={form.name} onChangeText={v=>updateForm("name",v)}/>
       <Field label="Descrição" value={form.description} onChangeText={v=>updateForm("description",v)} multiline/>
@@ -229,6 +285,7 @@ export default function SellerPanel() {
       <Button title="Criar minha loja" busy={busy} onPress={()=>void run(async()=>{
         await api.request("shops/mine","POST",{name:form.name,description:form.description,
           whatsapp:form.whatsapp,accept_guidelines:true});
+        await clearShopDraft();
       })}/>
       <T style={{color:colors.muted,fontSize:12}}>Ao criar sua loja você concorda com as diretrizes de vendas da comunidade.</T>
     </Card>:<>
@@ -375,16 +432,17 @@ export default function SellerPanel() {
             })}])}/>
         </View>)}
       </>)}
-      {tab==="Avaliações"&&(reviews.length?reviews.map(r=><View key={r.id} style={line}>
-        <T bold>Pedido #{r.order_code} · {r.rating}/5 estrelas</T>
-        <T>{r.description}</T><T>{r.status==="pending"?"Aguardando moderação":r.status==="approved"?"Aprovada":"Recusada"}</T>
-        {r.status==="pending"&&(["approved","rejected"] as const).map(status=>
-          <Button key={status} title={status==="approved"?"Aprovar avaliação":"Rejeitar avaliação"} secondary busy={busy}
-            onPress={()=>void run(async()=>{await api.request("shops/mine/reviews/"+r.id,"PATCH",{status});
-              const v=await api.request<{reviews:Review[]}>("shops/mine/reviews");setReviews(v.reviews);})}/>)}
-      </View>):<Empty title="Sem avaliações" body="As avaliações dos compradores aparecerão aqui."/>)}
+      {tab==="Avaliações"&&<SellerReviewRows reviews={reviews} busy={busy} onModerate={moderateReview}/>}
       {tab==="Minha loja"&&<Card>
         <T heading style={{fontSize:21}}>Dados da loja</T>
+        {draftDirty&&<View style={{backgroundColor:"#FFF5D9",padding:12,borderRadius:12,gap:8}}>
+          <T bold>Alterações não salvas</T>
+          <T>Seu rascunho está guardado neste dispositivo. Salve as configurações para publicar.</T>
+          <Button title="Descartar alterações" secondary disabled={busy} onPress={()=>Alert.alert("Descartar alterações?","O formulário voltará às configurações publicadas.",[
+            {text:"Manter rascunho",style:"cancel"},
+            {text:"Descartar",style:"destructive",onPress:()=>void (async()=>{await clearShopDraft();await reload();})()}
+          ])}/>
+        </View>}
         <Field label="Nome" value={form.name} onChangeText={v=>updateForm("name",v)}/>
         <Field label="Descrição" value={form.description} onChangeText={v=>updateForm("description",v)} multiline/>
         <Field label="WhatsApp" value={form.whatsapp} onChangeText={v=>updateForm("whatsapp",v)} keyboardType="phone-pad"/>
@@ -429,6 +487,7 @@ export default function SellerPanel() {
             ...form,logo_image:form.logo_image||null,cover_image:form.cover_image||null,
             delivery_fee_cents:fee,
           });
+          await clearShopDraft();
         })}/>
         <T heading style={{fontSize:21}}>Excluir minha loja</T>
         <T style={{color:colors.muted}}>Esta operação é irreversível. Pedidos em andamento precisam estar concluídos ou cancelados.</T>
@@ -438,6 +497,9 @@ export default function SellerPanel() {
             {text:"Manter loja",style:"cancel"},
             {text:"Excluir",style:"destructive",onPress:()=>void run(async()=>{
               await api.request("shops/mine","DELETE",{confirmation:"EXCLUIR LOJA"});
+              await clearShopDraft();
+              draftScopeRef.current=null;
+              formRef.current=defaultShop;setForm(defaultShop);
               setShop(null);setProducts([]);setDeletion("");
             })},
           ])}/>

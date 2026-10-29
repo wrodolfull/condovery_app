@@ -22,3 +22,7 @@ export const secure = {
 const carts = createChunkStore(secure);
 export const saveCart = carts.save;
 export const loadCart = carts.load;
+
+const shopDrafts=createChunkStore(secure);
+export const saveSellerDraft=shopDrafts.save;
+export const loadSellerDraft=shopDrafts.load;
