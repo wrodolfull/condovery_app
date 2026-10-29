@@ -235,7 +235,7 @@ async function enter(page: Page, withAds = true, withFairs = true, extendedCatal
     await route.fulfill({ json: value, headers });
   });
   await page.goto(origin);
-  await page.getByLabel("E-mail", { exact: true }).filter({ visible: true }).fill("teste@example.com");
+  await page.getByLabel("E-mail", { exact: true }).last().fill("teste@example.com");
   await page.getByLabel("Senha", { exact: true }).fill("Password123!");
   await page.getByText("Entrar com e-mail", { exact: true }).click();
   await expect(
@@ -500,7 +500,7 @@ test("sign-up checks condominium invitation before enabling account creation", a
   await page.getByLabel("WhatsApp com DDD").fill("11999991234");
   await page.getByRole("radio", { name: "Torre A" }).click();
   await page.getByLabel("Apartamento").fill("101");
-  await page.getByLabel("Senha", { exact: true }).filter({ visible: true }).fill("SenhaForte123!");
+  await page.getByLabel("Senha", { exact: true }).last().fill("SenhaForte123!");
   await expect(create).toBeEnabled();
   await create.click();
   await expect(page.getByText("Conta criada! Confirme seu e-mail.")).toBeVisible();
