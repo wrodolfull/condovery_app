@@ -32,6 +32,7 @@ import {
 } from "../domain/payment-methods";
 import { openWhatsApp } from "../external";
 import { statusLabels, type Order, type Quote } from "../types";
+import { useFocusedOrderRefresh,orderNeedsLiveRefresh } from "../useFocusedOrderRefresh";
 import { orderHistoryPath, type OrdersPage } from "../domain/order-pagination";
 export function Checkout() {
   const { viewer, api } = useAuth();
@@ -384,6 +385,7 @@ export function Orders() {
   const [historyError, setHistoryError] = useState("");
   const { width } = useWindowDimensions();
   const r = useResource<OrdersPage>(orderHistoryPath("buyer",status));
+  useFocusedOrderRefresh(r.reload,"buyer-orders:"+status);
   const older = history?.status===status?history.older:[];
   const nextCursor = history?.status===status?history.nextCursor:(r.data?.nextCursor??null);
   const first = r.data?.orders??[];
@@ -422,6 +424,12 @@ export function Orders() {
         ListHeaderComponent={
           <View style={{ gap: 16 }}>
             <T heading style={{ fontSize: 28 }}>Meus pedidos</T>
+            <View style={{flexDirection:"row",alignItems:"center",justifyContent:"space-between",gap:8}}>
+              <T style={{fontSize:12,color:colors.muted,flex:1}}>
+                {r.updatedAt ? "Atualizado às "+r.updatedAt.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}) : "Consultando pedidos"}
+              </T>
+              <Button title="Atualizar" secondary onPress={()=>void r.reload().catch(()=>{})}/>
+            </View>
             <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
               {[
                 ["", "Todos"],
@@ -490,6 +498,7 @@ export function OrderDetail({ success = false }: { success?: boolean }) {
   // A historical/deep-linked order might be on page 10, not the first 20.
   const r = useResource<{order:Order}>(id?"orders/"+encodeURIComponent(id):null);
   const order = r.data?.order;
+  useFocusedOrderRefresh(r.reload,"buyer-order-detail:"+id,orderNeedsLiveRefresh(order?.status));
   const [rating, setRating] = useState(0),
     [review, setReview] = useState(""),
     [busy, setBusy] = useState(false),
@@ -509,6 +518,9 @@ export function OrderDetail({ success = false }: { success?: boolean }) {
         </>
       )}
       {r.loading && <Loading />}
+      {order && <T style={{fontSize:12,color:colors.muted}}>
+        {r.updatedAt ? "Atualizado às "+r.updatedAt.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}) : "Consultando status"}
+      </T>}
       {order ? (
         <>
           <T heading style={{ fontSize: 25 }}>
