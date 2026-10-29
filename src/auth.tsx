@@ -42,7 +42,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [googleSignup, setGoogleSignup] = useState<Signup | null>(null);
   const exchange = useRef<Promise<void> | null>(null);
   const activeToken=useRef<string|null>(token);
-  activeToken.current=token;
   const clear = useCallback(async () => {
     activeToken.current=null;
     setToken(null);
@@ -52,6 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
   const api = useMemo(() => new ApiClient(origin, token), [token]);
   useEffect(() => {
+    activeToken.current=token;
     api.setExpirationHandler(() => {
       if(expirationBelongsToCurrentLogin(token,activeToken.current))void clear();
     });
