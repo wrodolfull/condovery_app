@@ -62,7 +62,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Resposta de sessão inválida.");
     const client = new ApiClient(origin, t);
     const r = await client.request<{ viewer: Viewer | null }>("me");
-    if (!r.viewer || r.viewer.status !== "approved") {
+    if (!r.viewer) {
+      await secure.remove("session");
+      throw new ApiError("Sua sessão expirou. Entre novamente.",401);
+    }
+    if (r.viewer.status !== "approved") {
       await secure.remove("session");
       throw new Error("Conta indisponível.");
     }
