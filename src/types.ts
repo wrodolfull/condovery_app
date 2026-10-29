@@ -75,6 +75,8 @@ export type Order = {
   subtotal_cents: number;
   delivery_fee_cents: number;
   shop_name: string;
+  buyer_name?: string;
+  buyer_phone?: string;
   tower: string;
   apartment: string;
   fulfillment: "delivery" | "pickup";
