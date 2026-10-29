@@ -32,6 +32,7 @@ import {
 } from "../domain/payment-methods";
 import { openWhatsApp } from "../external";
 import { statusLabels, type Order, type Quote } from "../types";
+import { orderHistoryPath, type OrdersPage } from "../domain/order-pagination";
 export function Checkout() {
   const { viewer, api } = useAuth();
   const market = useMarket();
@@ -377,21 +378,41 @@ export function Checkout() {
 }
 export function Orders() {
   const [status, setStatus] = useState("");
+  const { api } = useAuth();
+  const [history, setHistory] = useState<{ status:string;older:Order[];nextCursor:string|null }|null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [historyError, setHistoryError] = useState("");
   const { width } = useWindowDimensions();
-  const r = useResource<{ orders: Order[] }>(
-    "orders" + (status ? "?status=" + status : ""),
-  );
+  const r = useResource<OrdersPage>(orderHistoryPath("buyer",status));
+  const older = history?.status===status?history.older:[];
+  const nextCursor = history?.status===status?history.nextCursor:(r.data?.nextCursor??null);
+  const first = r.data?.orders??[];
+  const firstIds = new Set(first.map(o=>o.id));
+  const visibleOrders=[...first,...older.filter(o=>!firstIds.has(o.id))];
+  const loadOlder=async()=>{
+    if(!nextCursor||loadingOlder)return;
+    setLoadingOlder(true);setHistoryError("");
+    try{
+      const result=await api.request<OrdersPage>(orderHistoryPath("buyer",status,nextCursor));
+      setHistory(previous=>{
+        const previousOlder=previous?.status===status?previous.older:[];
+        const seen=new Set([...first,...previousOlder].map(o=>o.id));
+        return {status,older:[...previousOlder,...result.orders.filter(o=>!seen.has(o.id))],nextCursor:result.nextCursor};
+      });
+    }catch(e){setHistoryError((e as Error).message);}
+    finally{setLoadingOlder(false);}
+  };
   return (
     <Screen title="Meus pedidos" scrollable={false}>
       <FlatList
         accessibilityLabel="Lista de pedidos"
-        data={r.data?.orders ?? []}
+        data={visibleOrders}
         keyExtractor={(item) => item.id}
         initialNumToRender={8}
         maxToRenderPerBatch={8}
         windowSize={5}
         refreshing={!!r.loading && !!r.data}
-        onRefresh={() => void r.reload().catch(() => {})}
+        onRefresh={() => {setHistory(null);setHistoryError("");void r.reload().catch(() => {});}}
         contentContainerStyle={{
           paddingHorizontal: width <= 420 ? 15 : 20,
           paddingTop: width <= 420 ? 20 : 24,
@@ -411,7 +432,7 @@ export function Orders() {
               ].map(([key, label]) => (
                 <Pressable
                   key={key}
-                  onPress={() => setStatus(key)}
+                  onPress={() => {setStatus(key);setHistoryError("");}}
                   style={{
                     backgroundColor: key === status ? colors.yellow : "white",
                     padding: 10,
@@ -435,6 +456,13 @@ export function Orders() {
               body="Explore as lojas do seu condomínio para começar."
             />
           )
+        }
+        ListFooterComponent={
+          <View style={{gap:12,paddingTop:8}}>
+            {!!historyError&&<ErrorBox message={historyError}/>}
+            {!!nextCursor&&<Button title={loadingOlder?"Carregando pedidos...":"Ver pedidos anteriores"}
+              disabled={loadingOlder} onPress={()=>void loadOlder()}/>}
+          </View>
         }
         renderItem={({ item: o }) => (
           <Pressable
