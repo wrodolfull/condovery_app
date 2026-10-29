@@ -9,18 +9,31 @@ const cache = new Map<string, { data: string; bytes: number }>();
 const pending = new Map<string, Promise<string>>();
 let cacheSize = 0;
 
-function base64Image(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string" &&
-          /^data:image\/(?:png|jpeg|webp);base64,/i.test(reader.result))
-        resolve(reader.result);
-      else reject(new Error("Imagem inválida."));
-    };
-    reader.onerror = () => reject(new Error("Não foi possível ler a imagem."));
-    reader.readAsDataURL(blob);
-  });
+// Convert the fetched ArrayBuffer directly; avoid React Native Blob/FileReader
+// copies and the extra native-to-JS roundtrip warned about by Expo SDK 57.
+const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+export function imageDataUri(buffer: ArrayBuffer, mime: string): string {
+  const bytes = new Uint8Array(buffer);
+  if (bytes.byteLength > MAX_BYTES ||
+      !["image/webp", "image/png", "image/jpeg"].includes(mime))
+    throw new Error("Imagem inválida ou muito grande.");
+  const chunks: string[] = [];
+  let part = "";
+  for (let i = 0; i < bytes.length; i += 3) {
+    const x = bytes[i];
+    const y = i + 1 < bytes.length ? bytes[i + 1] : 0;
+    const z = i + 2 < bytes.length ? bytes[i + 2] : 0;
+    part += ALPHABET[x >> 2] +
+      ALPHABET[((x & 3) << 4) | (y >> 4)] +
+      (i + 1 < bytes.length ? ALPHABET[((y & 15) << 2) | (z >> 6)] : "=") +
+      (i + 2 < bytes.length ? ALPHABET[z & 63] : "=");
+    if (part.length >= 16384) {
+      chunks.push(part);
+      part = "";
+    }
+  }
+  chunks.push(part);
+  return "data:" + mime + ";base64," + chunks.join("");
 }
 
 export async function loadPrivateMedia(url: string, token: string): Promise<string> {
@@ -49,9 +62,9 @@ export async function loadPrivateMedia(url: string, token: string): Promise<stri
       throw new Error("Resposta não é uma imagem.");
     if (Number(response.headers.get("content-length") ?? 0) > MAX_BYTES)
       throw new Error("Imagem muito grande.");
-    const blob = await response.blob();
-    if (blob.size > MAX_BYTES) throw new Error("Imagem muito grande.");
-    const data = await base64Image(blob);
+    const buffer = await response.arrayBuffer();
+    if (buffer.byteLength > MAX_BYTES) throw new Error("Imagem muito grande.");
+    const data = imageDataUri(buffer, mime);
     const bytes = data.length * 2;
     if (bytes <= CACHE_BYTES) {
       cache.set(key, { data, bytes });
