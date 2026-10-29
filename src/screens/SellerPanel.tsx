@@ -160,7 +160,7 @@ export default function SellerPanel() {
       throw new Error("Preencha nome, categoria e preço válido em reais (ex.: 19,90).");
     if(p.promo.trim()&&(promo===null||promo<1||promo>=price))
       throw new Error("O preço promocional deve ser válido e menor que o original.");
-    if(p.stock.trim()&&(!/^\\d+$/.test(p.stock)||Number(p.stock)>100000))
+    if(p.stock.trim()&&(!/^\d+$/.test(p.stock)||Number(p.stock)>100000))
       throw new Error("Informe um estoque inteiro entre 0 e 100.000.");
     const option_groups=p.option_groups.map(group=>({...group,
       options:group.options.map(option=>{
