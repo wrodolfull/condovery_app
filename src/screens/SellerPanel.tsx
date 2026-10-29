@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, AppState, Pressable, ScrollView, Switch, View } from "react-native";
 import { randomUUID } from "expo-crypto";
 import { useFocusEffect } from "expo-router";
@@ -12,6 +12,7 @@ import type { Product, Category, Order } from "../types";
 import type { OptionGroup } from "../domain/orders";
 import { sellerItemDetails, sellerOrderDetails } from "../domain/seller-orders";
 import { formatBRLInput, parseBRLInput } from "../domain/money-input";
+import { mergeLatestOrders, orderHistoryPath, type OrdersPage } from "../domain/order-pagination";
 
 type Shop = {
   id:string; name:string; status:string; description:string; whatsapp:string;
@@ -53,6 +54,9 @@ export default function SellerPanel() {
   const [shop,setShop]=useState<Shop|null>(null);
   const [products,setProducts]=useState<Product[]>([]);
   const [orders,setOrders]=useState<Order[]>([]);
+  const [ordersCursor,setOrdersCursor]=useState<string|null>(null);
+  const [loadingOlder,setLoadingOlder]=useState(false);
+  const historyLoaded=useRef(false);
   const [ordersLoading,setOrdersLoading]=useState(false);
   const [ordersError,setOrdersError]=useState("");
   const [lastOrdersUpdate,setLastOrdersUpdate]=useState<Date|null>(null);
@@ -87,29 +91,58 @@ export default function SellerPanel() {
     finally{setLoading(false);}
   },[api]);
   useFocusEffect(useCallback(()=>{void reload();},[reload]));
-  // Poll only while the seller is viewing orders. A new sale must not require
-  // leaving the screen to become visible; never label a failed request "empty".
+  // The seller sees fresh orders while this tab is active, without losing
+  // historical pages they explicitly loaded. Cursor remains anchored to the
+  // oldest loaded order when new orders arrive during polling.
+  const refreshLatestOrders=useCallback(async(reset=false)=>{
+    const r=await api.request<OrdersPage>(orderHistoryPath("seller",""));
+    if(reset||!historyLoaded.current){
+      setOrders(r.orders);
+      setOrdersCursor(r.nextCursor);
+    }else{
+      setOrders(previous=>mergeLatestOrders(r.orders,previous));
+    }
+    setOrdersError("");
+    setLastOrdersUpdate(new Date());
+  },[api]);
   useFocusEffect(useCallback(()=>{
     if(tab!=="Pedidos"||!shop?.id)return;
     let active=true;
-    const load=async(initial:boolean)=>{
-      if(initial){setOrdersLoading(true);setOrdersError("");}
+    historyLoaded.current=false;
+    setOrdersLoading(true);setOrdersError("");
+    const refresh=async(initial:boolean)=>{
       try{
-        const r=await api.request<{orders:Order[]}>("orders?scope=seller");
-        if(active){setOrders(r.orders);setOrdersError("");setLastOrdersUpdate(new Date());}
+        const page=await api.request<OrdersPage>(orderHistoryPath("seller",""));
+        if(!active)return;
+        if(initial||!historyLoaded.current){
+          setOrders(page.orders);setOrdersCursor(page.nextCursor);
+        }else setOrders(previous=>mergeLatestOrders(page.orders,previous));
+        setOrdersError("");setLastOrdersUpdate(new Date());
       }catch(e){if(active)setOrdersError((e as Error).message);}
       finally{if(active&&initial)setOrdersLoading(false);}
     };
-    void load(true);
-    // Do not poll while the app is backgrounded; refresh when it resumes.
-    const timer=setInterval(()=>{
-      if(AppState.currentState==="active")void load(false);
-    },20000);
+    void refresh(true);
+    const timer=setInterval(()=>{if(AppState.currentState==="active")void refresh(false);},20000);
     const subscription=AppState.addEventListener("change",state=>{
-      if(state==="active")void load(false);
+      if(state==="active")void refresh(false);
     });
     return ()=>{active=false;clearInterval(timer);subscription.remove();};
   },[api,shop?.id,tab]));
+  const loadOlderOrders=async()=>{
+    if(!ordersCursor||loadingOlder)return;
+    setLoadingOlder(true);
+    try{
+      const page=await api.request<OrdersPage>(orderHistoryPath("seller","",ordersCursor));
+      historyLoaded.current=true;
+      setOrders(previous=>{
+        const seen=new Set(previous.map(o=>o.id));
+        return [...previous,...page.orders.filter(o=>!seen.has(o.id))];
+      });
+      setOrdersCursor(page.nextCursor);
+      setOrdersError("");
+    }catch(e){setOrdersError((e as Error).message);}
+    finally{setLoadingOlder(false);}
+  };
   useEffect(()=>{
     if(!shop)return;
     let active=true;
@@ -223,8 +256,7 @@ export default function SellerPanel() {
           </T>
           <Button title="Atualizar" secondary busy={ordersLoading} onPress={()=>{
             setOrdersLoading(true);
-            void api.request<{orders:Order[]}>("orders?scope=seller")
-              .then(r=>{setOrders(r.orders);setOrdersError("");setLastOrdersUpdate(new Date());})
+            void refreshLatestOrders()
               .catch(e=>setOrdersError((e as Error).message))
               .finally(()=>setOrdersLoading(false));
           }}/>
@@ -248,20 +280,22 @@ export default function SellerPanel() {
             </View>
             {o.status==="awaiting_confirmation"&&<Button title="Confirmar pedido" busy={busy} onPress={()=>void run(async()=>{
               await api.request("orders/"+o.id,"PATCH",{status:"confirmed"});
-              const x=await api.request<{orders:Order[]}>("orders?scope=seller");setOrders(x.orders);setLastOrdersUpdate(new Date());
+              await refreshLatestOrders();
             })}/>}
             {o.status==="confirmed"&&<Button title="Concluir pedido" busy={busy} onPress={()=>void run(async()=>{
               await api.request("orders/"+o.id,"PATCH",{status:"completed"});
-              const x=await api.request<{orders:Order[]}>("orders?scope=seller");setOrders(x.orders);setLastOrdersUpdate(new Date());
+              await refreshLatestOrders();
             })}/>}
             {["awaiting_confirmation","confirmed"].includes(o.status)&&
               <Button title="Cancelar pedido" secondary busy={busy} onPress={()=>Alert.alert("Cancelar pedido?","Esta ação altera o status do pedido.",[
                 {text:"Voltar",style:"cancel"},
                 {text:"Cancelar pedido",style:"destructive",onPress:()=>void run(async()=>{
                   await api.request("orders/"+o.id,"PATCH",{status:"cancelled"});
-                  const x=await api.request<{orders:Order[]}>("orders?scope=seller");setOrders(x.orders);setLastOrdersUpdate(new Date());
+                  await refreshLatestOrders();
                 })}])}/>}
           </View>)}
+        {!!ordersCursor&&<Button title={loadingOlder?"Carregando pedidos...":"Ver pedidos anteriores"}
+          disabled={loadingOlder||busy} secondary onPress={()=>void loadOlderOrders()}/>}
       </View>}
       {tab==="Produtos"&&(productForm?<Card>
         <T heading style={{fontSize:21}}>{productForm.id?"Editar produto":"Novo produto"}</T>
