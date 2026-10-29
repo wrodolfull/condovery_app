@@ -10,6 +10,7 @@ import { uploadPicture } from "../upload";
 import { allowedPaymentMethods, PAYMENT_LABELS, type PaymentMethod } from "../domain/payment-methods";
 import type { Product, Category, Order } from "../types";
 import type { OptionGroup } from "../domain/orders";
+import { sellerItemDetails, sellerOrderDetails } from "../domain/seller-orders";
 
 type Shop = {
   id:string; name:string; status:string; description:string; whatsapp:string;
@@ -51,6 +52,9 @@ export default function SellerPanel() {
   const [shop,setShop]=useState<Shop|null>(null);
   const [products,setProducts]=useState<Product[]>([]);
   const [orders,setOrders]=useState<Order[]>([]);
+  const [ordersLoading,setOrdersLoading]=useState(false);
+  const [ordersError,setOrdersError]=useState("");
+  const [lastOrdersUpdate,setLastOrdersUpdate]=useState<Date|null>(null);
   const [reviews,setReviews]=useState<Review[]>([]);
   const [categories,setCategories]=useState<Category[]>([]);
   const [insight,setInsight]=useState<Insight|null>(null);
@@ -81,15 +85,29 @@ export default function SellerPanel() {
     finally{setLoading(false);}
   },[api]);
   useFocusEffect(useCallback(()=>{void reload();},[reload]));
+  // Poll only while the seller is viewing orders. A new sale must not require
+  // leaving the screen to become visible; never label a failed request "empty".
+  useFocusEffect(useCallback(()=>{
+    if(tab!=="Pedidos"||!shop?.id)return;
+    let active=true;
+    const load=async(initial:boolean)=>{
+      if(initial){setOrdersLoading(true);setOrdersError("");}
+      try{
+        const r=await api.request<{orders:Order[]}>("orders?scope=seller");
+        if(active){setOrders(r.orders);setOrdersError("");setLastOrdersUpdate(new Date());}
+      }catch(e){if(active)setOrdersError((e as Error).message);}
+      finally{if(active&&initial)setOrdersLoading(false);}
+    };
+    void load(true);
+    const timer=setInterval(()=>void load(false),20000);
+    return ()=>{active=false;clearInterval(timer);};
+  },[api,shop?.id,tab]));
   useEffect(()=>{
     if(!shop)return;
     let active=true;
     const task=async()=>{
       try {
-        if(tab==="Pedidos"){
-          const r=await api.request<{orders:Order[]}>("orders?scope=seller");
-          if(active)setOrders(r.orders);
-        }else if(tab==="Avaliações"){
+        if(tab==="Avaliações"){
           const r=await api.request<{reviews:Review[]}>("shops/mine/reviews");
           if(active)setReviews(r.reviews);
         }else if(tab==="Resultados"){
@@ -174,27 +192,53 @@ export default function SellerPanel() {
           <T bold style={{color:t===tab?"white":colors.ink}}>{t}</T>
         </Pressable>)}
       </ScrollView>
-      {tab==="Pedidos"&&(orders.length?orders.map(o=><View key={o.id} style={line}>
-        <T bold>Pedido #{o.code} · {money(o.total_cents)}</T>
-        <T>{o.status==="awaiting_confirmation"?"Aguardando confirmação":o.status==="confirmed"?"Confirmado":o.status==="completed"?"Concluído":"Cancelado"}</T>
-        <T>{o.tower} · Apto {o.apartment}</T>
-        {o.items.map((item,i)=><T key={i}>{item.quantity} × {item.name}</T>)}
-        {o.status==="awaiting_confirmation"&&<Button title="Confirmar pedido" busy={busy} onPress={()=>void run(async()=>{
-          await api.request("orders/"+o.id,"PATCH",{status:"confirmed"});
-          const x=await api.request<{orders:Order[]}>("orders?scope=seller");setOrders(x.orders);
-        })}/>}
-        {o.status==="confirmed"&&<Button title="Concluir pedido" busy={busy} onPress={()=>void run(async()=>{
-          await api.request("orders/"+o.id,"PATCH",{status:"completed"});
-          const x=await api.request<{orders:Order[]}>("orders?scope=seller");setOrders(x.orders);
-        })}/>}
-        {["awaiting_confirmation","confirmed"].includes(o.status)&&
-          <Button title="Cancelar pedido" secondary busy={busy} onPress={()=>Alert.alert("Cancelar pedido?","Esta ação altera o status do pedido.",[
-            {text:"Voltar",style:"cancel"},
-            {text:"Cancelar pedido",style:"destructive",onPress:()=>void run(async()=>{
-              await api.request("orders/"+o.id,"PATCH",{status:"cancelled"});
-              const x=await api.request<{orders:Order[]}>("orders?scope=seller");setOrders(x.orders);
-            })}])}/>}
-      </View>):<Empty title="Nenhum pedido recebido" body="Os pedidos da sua loja aparecerão aqui."/>)}
+      {tab==="Pedidos"&&<View style={{gap:12}}>
+        <View style={{flexDirection:"row",alignItems:"center",justifyContent:"space-between",gap:10}}>
+          <T style={{color:colors.muted,fontSize:12}}>
+            {lastOrdersUpdate?"Atualizado às "+lastOrdersUpdate.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}):"Aguardando pedidos"}
+          </T>
+          <Button title="Atualizar" secondary busy={ordersLoading} onPress={()=>{
+            setOrdersLoading(true);
+            void api.request<{orders:Order[]}>("orders?scope=seller")
+              .then(r=>{setOrders(r.orders);setOrdersError("");setLastOrdersUpdate(new Date());})
+              .catch(e=>setOrdersError((e as Error).message))
+              .finally(()=>setOrdersLoading(false));
+          }}/>
+        </View>
+        {!!ordersError&&<ErrorBox message={"Não foi possível atualizar os pedidos: "+ordersError}/>}
+        {ordersLoading&&!lastOrdersUpdate?<Loading/>:
+          !ordersError&&!orders.length?<Empty title="Nenhum pedido recebido" body="Os pedidos da sua loja aparecerão aqui."/>:
+          orders.map(o=><View key={o.id} style={line}>
+            <T bold style={{fontSize:17}}>Pedido #{o.code}</T>
+            <T bold>{o.status==="awaiting_confirmation"?"Aguardando confirmação":o.status==="confirmed"?"Confirmado":o.status==="completed"?"Concluído":"Cancelado"}</T>
+            {sellerOrderDetails(o).map((detail,i)=><T key={"detail-"+i}>{detail}</T>)}
+            <T bold>Itens do pedido</T>
+            {o.items.map((item,i)=><View key={i} style={{gap:4,paddingVertical:7,borderTopWidth:1,borderColor:colors.line}}>
+              <T bold>{item.quantity} × {item.name} · {money(item.unit_price_cents*item.quantity)}</T>
+              {sellerItemDetails(item).map((detail,j)=><T key={j} style={{color:colors.muted}}>{detail}</T>)}
+            </View>)}
+            <View style={{borderTopWidth:1,borderColor:colors.line,paddingTop:9,gap:4}}>
+              <T>Subtotal: {money(o.subtotal_cents??o.total_cents)}</T>
+              {o.fulfillment==="delivery"&&<T>Taxa de entrega: {money(o.delivery_fee_cents??0)}</T>}
+              <T bold>Total: {money(o.total_cents)}</T>
+            </View>
+            {o.status==="awaiting_confirmation"&&<Button title="Confirmar pedido" busy={busy} onPress={()=>void run(async()=>{
+              await api.request("orders/"+o.id,"PATCH",{status:"confirmed"});
+              const x=await api.request<{orders:Order[]}>("orders?scope=seller");setOrders(x.orders);setLastOrdersUpdate(new Date());
+            })}/>}
+            {o.status==="confirmed"&&<Button title="Concluir pedido" busy={busy} onPress={()=>void run(async()=>{
+              await api.request("orders/"+o.id,"PATCH",{status:"completed"});
+              const x=await api.request<{orders:Order[]}>("orders?scope=seller");setOrders(x.orders);setLastOrdersUpdate(new Date());
+            })}/>}
+            {["awaiting_confirmation","confirmed"].includes(o.status)&&
+              <Button title="Cancelar pedido" secondary busy={busy} onPress={()=>Alert.alert("Cancelar pedido?","Esta ação altera o status do pedido.",[
+                {text:"Voltar",style:"cancel"},
+                {text:"Cancelar pedido",style:"destructive",onPress:()=>void run(async()=>{
+                  await api.request("orders/"+o.id,"PATCH",{status:"cancelled"});
+                  const x=await api.request<{orders:Order[]}>("orders?scope=seller");setOrders(x.orders);setLastOrdersUpdate(new Date());
+                })}])}/>}
+          </View>)}
+      </View>}
       {tab==="Produtos"&&(productForm?<Card>
         <T heading style={{fontSize:21}}>{productForm.id?"Editar produto":"Novo produto"}</T>
         <Field label="Nome" value={productForm.name} onChangeText={v=>setProductForm(p=>p?{...p,name:v}:p)}/>
