@@ -171,6 +171,19 @@ async function enter(page: Page, withAds = true, withFairs = true, extendedCatal
         shops: [activeShop],
         products: activeProducts,
       };
+    else if (endpoint === "shops" && request.method() === "GET") {
+      const search = (url.searchParams.get("search") ?? "").toLowerCase();
+      const matches = [activeShop].filter((item) =>
+        item.name.toLowerCase().includes(search)
+      );
+      const limit = Number(url.searchParams.get("limit") ?? "24");
+      const start = Number(url.searchParams.get("cursor") ?? "0");
+      value = {
+        shops: matches.slice(start, start + limit),
+        hasMore: matches.length > start + limit,
+        nextCursor: matches.length > start + limit ? String(start + limit) : null,
+      };
+    }
     else if (endpoint === "favorites" && request.method() === "POST") {
       favoriteIds.push(request.postDataJSON().product_id);
       value = { ok: true };

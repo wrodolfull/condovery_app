@@ -69,6 +69,7 @@ import type { Category, Product, Shop } from "../types";
 import { AdsCarousel, type AdCampaign } from "../components/AdsCarousel";
 import { FairHomeTeaser } from "../components/FairCards";
 import { ShopShareSheet } from "../components/ShopShareSheet";
+import { appendUniqueShops } from "../domain/shop-directory";
 export function Home() {
   const { viewer } = useAuth();
   const { home } = useMarket();
@@ -563,16 +564,71 @@ function useCatalog(query: string, category: string, enabled = true) {
     },
   };
 }
+function useShopDirectory(query: string) {
+  const {api,viewer}=useAuth();
+  const filter=(viewer?.condominium_id??"")+"|"+query.trim();
+  const [pagination,setPagination]=useState<{filter:string;cursor:string|null}>({filter:"",cursor:null});
+  const [result,setResult]=useState<{filter:string;shops:Shop[];nextCursor:string|null;hasMore:boolean}>({filter:"",shops:[],nextCursor:null,hasMore:false});
+  const [request,setRequest]=useState({filter:"",loading:true,error:""});
+  const [retry,setRetry]=useState(0);
+  const cursor=pagination.filter===filter?pagination.cursor:null;
+  // Reset pagination when switching tenants or search terms; schedule outside render.
+  useEffect(()=>{
+    const timer=setTimeout(()=>setPagination({filter,cursor:null}),0);
+    return()=>clearTimeout(timer);
+  },[filter]);
+  const enabled=viewer?.status==="approved";
+  useEffect(()=>{
+    if(!enabled)return;
+    let active=true;
+    const timer=setTimeout(()=>{
+      setRequest({filter,loading:true,error:""});
+      const params=new URLSearchParams({limit:"24"});
+      if(query.trim())params.set("search",query.trim());
+      if(cursor)params.set("cursor",cursor);
+      api.request<{shops:Shop[];nextCursor:string|null;hasMore:boolean}>("shops?"+params)
+        .then(response=>{
+          if(!active)return;
+          setResult(previous=>({
+            filter,
+            shops:cursor&&previous.filter===filter?appendUniqueShops(previous.shops,response.shops):response.shops,
+            nextCursor:response.nextCursor,
+            hasMore:response.hasMore
+          }));
+          setRequest({filter,loading:false,error:""});
+        })
+        .catch(error=>{
+          if(active)setRequest({filter,loading:false,error:error instanceof Error?error.message:"Não foi possível carregar as lojas."});
+        });
+    },80);
+    return()=>{active=false;clearTimeout(timer)};
+  },[api,enabled,filter,query,cursor,retry]);
+  const valid=result.filter===filter;
+  const loading=request.filter!==filter||request.loading;
+  return {
+    shops:valid?result.shops:[],
+    loading,
+    error:request.filter===filter?request.error:"",
+    hasMore:valid&&result.hasMore,
+    retry:()=>setRetry(n=>n+1),
+    next:()=>{
+      if(!valid||loading||request.error||!result.nextCursor)return;
+      setRequest(previous=>({...previous,loading:true}));
+      setPagination({filter,cursor:result.nextCursor});
+    }
+  };
+}
 type ExploreRow =
   | { kind: "products"; key: string; products: Product[] }
   | { kind: "shop"; key: string; shop: Shop }
-  | { kind: "more" | "empty" | "loading" | "shops-title"; key: string };
+  | { kind: "more" | "empty" | "loading" | "shops-title" | "shops-more" | "shops-empty" | "shops-loading" | "shops-error"; key: string };
 export function Explore() {
   const params = useLocalSearchParams<{ categoria?: string; ofertas?: string; busca?: string }>();
   const { home } = useMarket();
   const [query, setQuery] = useState(params.busca ?? "");
   const category = params.categoria ?? "";
   const catalog = useCatalog(query, category);
+  const directory = useShopDirectory(query);
   const { loading, error, hasMore } = catalog;
   const products = catalog.products.filter(
     (p) => !params.ofertas || p.promo_price_cents != null,
@@ -595,8 +651,13 @@ export function Explore() {
   else if (!products.length) rows.push({ kind: "empty", key: "empty" });
   if (hasMore) rows.push({ kind: "more", key: "more" });
   rows.push({ kind: "shops-title", key: "shops-title" });
-  for (const shop of home.data?.shops ?? [])
+  for (const shop of directory.shops)
     rows.push({ kind: "shop", key: "shop-" + shop.id, shop });
+  if(directory.loading) rows.push({kind:"shops-loading",key:"shops-loading"});
+  else if(directory.error) rows.push({kind:"shops-error",key:"shops-error"});
+  else if(!directory.shops.length) rows.push({kind:"shops-empty",key:"shops-empty"});
+  if(!directory.loading&&!directory.error&&directory.hasMore)
+    rows.push({kind:"shops-more",key:"shops-more"});
   return (
     <Screen title="Explorar" scrollable={false}>
       <FlatList
@@ -641,6 +702,10 @@ export function Explore() {
           if (item.kind === "shop") return <ShopRow shop={item.shop} />;
           if (item.kind === "shops-title")
             return <Section title="Todas as lojas" />;
+           if (item.kind === "shops-loading") return <Loading />;
+           if (item.kind === "shops-empty") return <Empty title="Nenhuma loja encontrada" body={query?"Tente buscar por outro nome.":"As lojas aprovadas aparecerão aqui."} />;
+           if (item.kind === "shops-error") return <View style={{gap:10}}><ErrorBox message={directory.error}/><Button title="Tentar novamente" secondary onPress={directory.retry}/></View>;
+           if (item.kind === "shops-more") return <Button title="Mostrar mais lojas" secondary onPress={directory.next}/>;
           if (item.kind === "loading") return <Loading />;
           if (item.kind === "empty")
             return (
