@@ -390,7 +390,7 @@ test("order history loads records beyond the first 20 without losing older pages
     const cursor=url.searchParams.get("cursor")??"";
     requested.push(cursor);
     const all=Array.from({length:25},(_,i)=>({
-      id:id(200+i),code:25-i,status:"completed",total_cents:1000,subtotal_cents:1000,
+      id:String(200+i).padStart(8,"0")+"-2222-4333-8444-555555555555",code:25-i,status:"completed",total_cents:1000,subtotal_cents:1000,
       delivery_fee_cents:0,shop_name:"Loja de Teste",tower:"Torre A",apartment:"101",
       fulfillment:"pickup",delivery_day:null,delivery_window:"",
       delivery_instructions:[],note:"",can_review:false,created_at:"2026-10-29T12:00:00Z",items:[]
