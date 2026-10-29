@@ -289,6 +289,18 @@ for (const width of [360, 390, 430]) {
       .getByRole("button", { name: "Ver Bolo de cenoura", exact: true })
       .last();
     await product.scrollIntoViewIfNeeded();
+    // Two products in the Home "Feito pelos seus vizinhos" section must
+    // share one row at every tested phone width. A Yoga flex-wrap rounding
+    // regression previously stacked otherwise half-width cards vertically.
+    const adjacentProduct = page.getByRole("button", {
+      name: "Ver Cesta esgotada", exact: true,
+    });
+    const firstBox = await product.boundingBox();
+    const secondBox = await adjacentProduct.boundingBox();
+    expect(firstBox).toBeTruthy();
+    expect(secondBox).toBeTruthy();
+    expect(Math.abs(firstBox!.y - secondBox!.y)).toBeLessThan(3);
+    expect(secondBox!.x).toBeGreaterThan(firstBox!.x);
     const photo = product.getByLabel("Bolo de cenoura", { exact: true });
     const rect = await photo.boundingBox();
     expect(rect).toBeTruthy();
@@ -342,7 +354,7 @@ for (const width of [360, 390, 430]) {
     await checkNav(page,"Salvos");
     await expect(page.getByRole("button", { name: "Ver Bolo de cenoura", exact: true }).filter({ visible: true })).toHaveCount(1);
     await page.getByRole("button", { name: "Remover dos favoritos", exact: true }).filter({ visible: true }).click();
-    await expect(page.getByText("Seu próximo favorito mora aqui", { exact: true })).toBeVisible();
+    await expect(page.getByText("Seu próximo favorito mora aqui", { exact: true }).filter({ visible: true })).toBeVisible();
     await page.getByRole("tab", { name: "Pedidos", exact: true }).click();
     await checkNav(page, "Pedidos");
     await page.getByRole("tab", { name: "Conta", exact: true }).click();
