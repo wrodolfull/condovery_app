@@ -6,7 +6,10 @@ Aplicativo **Android e iOS** com Expo SDK 57, React Native, Expo Router e TypeSc
 
 - Login por e-mail, cadastro com convite/torre/apartamento, Google com PKCE e sessão nativa no SecureStore.
 - Solicitação de recuperação de senha; o link seguro enviado por e-mail conclui a redefinição na web e o usuário retorna ao app para entrar.
-- Início, busca, categorias, ofertas, lojas, produtos, personalizações, favoritos, carrinho e pedidos.
+- Início, busca na própria página, categorias, ofertas, lojas, produtos, personalizações, favoritos, carrinho e pedidos.
+- Barra flutuante compartilhada: Início, Explorar, Salvos, Pedidos e Conta, presente também nas páginas internas.
+- Anúncios com selo PUBLICIDADE, localização, ação Ver oferta, paginação e registro de visualização; a arte semanal aparece quando não há anúncios.
+- Feiras com capa, datas, listagem e produtos; cards quadrados com selo de oferta e cabeçalho da loja com logo circular sobre a capa.
 - Cotação no backend, confirmação de preço alterado, retomada idempotente de uma tentativa e abertura do WhatsApp após persistir o pedido.
 - Perfil, foto, exclusão de conta, avaliações, denúncias e ajuda ao morador.
 - Feiras publicadas e Desapego conforme habilitação do condomínio.
@@ -95,12 +98,16 @@ npm test
 npx expo install --check
 npx expo-doctor@latest
 npm run export:check
+npx playwright install chromium
+npm run test:ui
 ```
+
+Os testes de interface usam a exportação web e uma API simulada exclusivamente em `https://condovery.example`; exporte com esse `EXPO_PUBLIC_API_URL` para executá-los. Eles verificam a barra nas telas internas, busca, favoritos, carrinho, anúncios, feiras, cards e loja em 360, 390 e 430 px. A CI guarda capturas em `mobile-preview-qa`.
 
 A CI verifica tipos, lint, testes, versões do SDK e exportação das três plataformas. Exportar JavaScript/Hermes não equivale a compilar/assinar o aplicativo com EAS nem a testar push físico. Google real, e-mails, imagens do Storage e recebimento em Android/iOS ainda precisam de validação no ambiente configurado do proprietário.
 
 ## Referência da interface
 
-Origem inicial: commit web `d68f0feaf94cb5a0dcbd29cbc05dede4315ee13f`. Coral `#FC6741`, amarelo `#FFCF25`, creme `#F7F5EE`, grafite `#251F18`, Outfit e DM Sans. Artes existentes foram reaproveitadas; não há catálogo fictício ou backend alternativo.
+Origem inicial: commit web `d68f0feaf94cb5a0dcbd29cbc05dede4315ee13f`. A revisão da vitrine usa `c4241386d7a36966b2f2659104f86ee431bb9aea` como referência para navegação, hero, categorias, publicidade, feiras, produtos e lojas. Coral `#FC6741`, amarelo `#FFCF25`, creme `#F7F5EE`, grafite `#251F18`, Outfit e DM Sans. Artes existentes foram reaproveitadas; não há catálogo fictício ou backend alternativo.
 
 Regras puras de pedidos, pagamento e senhas em `src/domain/` foram portadas do mesmo commit. A fidelidade nativa em aparelhos físicos deve ser comparada tela a tela; diferenças de fonte, teclado e safe area exigem QA próprio de cada plataforma.

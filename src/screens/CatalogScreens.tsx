@@ -1,6 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
-  AppState,
   Image,
   Pressable,
   RefreshControl,
@@ -12,7 +11,6 @@ import {
 import { router, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import {
-  Search,
   ShoppingBag,
   LayoutGrid,
   CakeSlice,
@@ -29,6 +27,12 @@ import {
   HeartPulse,
   House,
   Smartphone,
+  ArrowRight,
+  Bell,
+  Clock3,
+  Share2,
+  Store,
+  Truck,
 } from "lucide-react-native";
 import { useAuth } from "../auth";
 import { useMarket } from "../market";
@@ -42,6 +46,9 @@ import {
   Loading,
   Picture,
   ProductCard,
+  ProductGrid,
+  SearchBox,
+  ShopLogo,
   Quantity,
   Screen,
   Section,
@@ -49,217 +56,323 @@ import {
   T,
   alertError,
 } from "../ui";
-import { colors, money } from "../theme";
+import { colors, fonts, money } from "../theme";
 import {
   extrasTotal,
   selectedOptions,
   unitPrice,
   type Selection,
 } from "../domain/orders";
-import { PAYMENT_LABELS } from "../domain/payment-methods";
+import { RoundedStars } from "../components/RoundedStars";
 import type { Category, Product, Shop } from "../types";
-import { openWeb } from "../external";
+import { AdsCarousel, type AdCampaign } from "../components/AdsCarousel";
+import { FairHomeTeaser } from "../components/FairCards";
 export function Home() {
   const { viewer } = useAuth();
   const { home } = useMarket();
-  const ads = useResource<{
-    campaigns: {
-      id: string;
-      merchant_name: string;
-      headline: string;
-      description: string;
-      location: string;
-      image_url: string | null;
-      destination_url: string;
-    }[];
-  }>("ads");
-  const fairs = useResource<{ fairs: { id: string; title: string }[] }>(
-    "fairs",
-  );
+  const [query, setQuery] = useState("");
+  const catalog = useCatalog(query, "", !!query);
+  const ads = useResource<{ campaigns: AdCampaign[] }>("ads");
+  const { width } = useWindowDimensions();
+  const explore = () => router.navigate("/explorar");
+  const featured = (home.data?.products ?? [])
+    .filter((p) => p.promo_price_cents != null || p.is_featured)
+    .slice(0, 8);
+  const products = query
+    ? catalog.products
+    : (home.data?.products ?? []).slice(0, 10);
   return (
     <Screen
       refreshControl={
         <RefreshControl
           refreshing={home.loading}
-          onRefresh={() => void home.reload().catch(() => {})}
+          onRefresh={() => {
+            void Promise.allSettled([home.reload(), ads.reload()]);
+          }}
           tintColor={colors.orange}
         />
       }
     >
-      <View>
-        <T style={{ color: colors.muted }}>
-          Olá, {viewer?.name.split(" ")[0]} 👋
-        </T>
-        <T heading style={{ fontSize: 29, lineHeight: 35 }}>
-          Seu condomínio mais perto de você!
-        </T>
-      </View>
-      <Pressable
-        onPress={() => router.push("/explorar")}
+      <View
         style={{
-          padding: 15,
-          backgroundColor: "white",
-          borderRadius: 28,
-          flexDirection: "row",
-          gap: 10,
-        }}
-      >
-        <Search size={19} color={colors.muted} />
-        <T style={{ color: colors.muted }}>Buscar por produto ou loja</T>
-      </Pressable>
-      <LinearGradient
-        colors={["#F96036", "#FF8550"]}
-        style={{ padding: 24, borderRadius: 29, gap: 14 }}
-      >
-        <T style={{ color: "white", fontSize: 12 }}>COMPRE DOS SEUS VIZINHOS</T>
-        <T heading style={{ fontSize: 29, lineHeight: 35, color: "white" }}>
-          Tudo de bom mora aqui.
-        </T>
-        <T style={{ color: "white" }}>
-          Descubra o que seus vizinhos preparam para você.
-        </T>
-        <Button
-          title="Começar a explorar"
-          onPress={() => router.push("/explorar")}
-        />
-      </LinearGradient>
-      <ErrorBox
-        message={home.error}
-        retry={() => void home.reload().catch(() => {})}
-      />
-      {home.loading && !home.data && <Loading />}
-      <Section title="Descubra o que tem por aqui" />
-      <Categories categories={home.data?.categories ?? []} />
-      {ads.data?.campaigns.length ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 12 }}
-        >
-          {ads.data.campaigns.map((ad) => (
-            <Ad key={ad.id} ad={ad} />
-          ))}
-        </ScrollView>
-      ) : null}
-      {fairs.data?.fairs.map((f) => (
-        <Card key={f.id}>
-          <T heading style={{ fontSize: 19 }}>
-            {f.title}
-          </T>
-          <Button
-            title="Visitar a feira"
-            secondary
-            onPress={() =>
-              router.push({ pathname: "/feira/[id]", params: { id: f.id } })
-            }
-          />
-        </Card>
-      ))}
-      <Pressable
-        onPress={() =>
-          router.push({ pathname: "/explorar", params: { ofertas: "1" } })
-        }
-        style={{
-          backgroundColor: "#FFCF25",
-          padding: 18,
-          borderRadius: 24,
           flexDirection: "row",
           alignItems: "center",
+          justifyContent: "space-between",
+          gap: 0,
+          marginTop: 7,
         }}
       >
         <View style={{ flex: 1 }}>
-          <T heading style={{ fontSize: 23 }}>
-            Ofertas da semana
+          <T
+            style={{
+              color: "#595B56",
+              fontFamily: fonts.medium,
+              lineHeight: 31.5,
+              marginBottom: 4,
+            }}
+          >
+            Olá, {viewer?.name.split(" ")[0]}!{" "}
+            <T style={{ color: colors.orange, fontSize: 21 }}>✳</T>
           </T>
-          <T>Achadinhos da sua vizinhança</T>
+          <T
+            heading
+            style={{
+              fontFamily: fonts.display,
+              fontSize: Math.min(35, Math.max(25, width * 0.03)),
+              lineHeight: 29,
+              letterSpacing: -1.15,
+            }}
+          >
+            Seu condomínio mais perto de você!
+          </T>
         </View>
-        <Image
-          source={require("../../assets/images/ofertas-semana.png")}
-          style={{ width: 110, height: 100 }}
-          resizeMode="contain"
-        />
-      </Pressable>
-      <Track
-        title="Ofertas da semana"
-        products={(home.data?.products ?? [])
-          .filter((p) => p.promo_price_cents != null || p.is_featured)
-          .slice(0, 8)}
+        <View
+          style={{
+            backgroundColor: "#FFDFCF",
+            width: 52,
+            height: 52,
+            borderRadius: 26,
+            alignItems: "center",
+            justifyContent: "center",
+            transform: [{ rotate: "5deg" }],
+          }}
+        >
+          <ShoppingBasket size={27} color="#E65731" />
+        </View>
+      </View>
+      <View style={{ marginBottom: 4 }}>
+        <SearchBox value={query} onChangeText={setQuery} />
+      </View>
+      {!query && (
+        <LinearGradient
+          colors={["#F96036", "#FF8550"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0.6 }}
+          style={{
+            padding: width <= 420 ? 19 : 22,
+            borderRadius: 29,
+            boxShadow: "0 15px 35px rgba(234,88,43,.13)",
+            alignItems: "flex-start",
+            overflow: "hidden",
+          }}
+        >
+          <T
+            bold
+            style={{ color: "#FFF3E9", fontSize: 10, lineHeight: 15, letterSpacing: 1.1 }}
+          >
+            TUDO DE BOM MORA AQUI
+          </T>
+          <T
+            heading
+            style={{
+              marginTop: 12,
+              marginBottom: 8,
+              fontFamily: fonts.display,
+              fontSize: Math.min(28, Math.max(24, width * 0.064)),
+              lineHeight: Math.min(28, Math.max(24, width * 0.064)) * 1.06,
+              letterSpacing: -0.6,
+              color: "white",
+            }}
+          >
+            Descubra o melhor{" "}
+            <T
+              heading
+              style={{
+                color: "#FFE24D",
+                fontFamily: fonts.display,
+                fontSize: Math.min(28, Math.max(24, width * 0.064)),
+                lineHeight: Math.min(28, Math.max(24, width * 0.064)) * 1.06,
+              }}
+            >
+              da sua vizinhança.
+            </T>
+          </T>
+          <T style={{ color: "#FFF2EA", fontSize: 13, lineHeight: 19.5 }}>
+            Produtos, comida e serviços de quem mora pertinho de você.
+          </T>
+          <Image
+            source={require("../../assets/images/hero.png")}
+            accessibilityLabel="Produtos e serviços do condomínio"
+            style={{
+              width: "100%",
+              maxWidth: 290,
+              height: width <= 420 ? 123 : 134,
+              alignSelf: "center",
+              marginTop: 6,
+              marginBottom: 4,
+            }}
+            resizeMode="contain"
+          />
+          <Pressable
+            accessibilityRole="button"
+            onPress={explore}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+              backgroundColor: "#FFFEF7",
+              borderRadius: 999,
+              paddingVertical: 10,
+              paddingHorizontal: 12,
+              marginTop: 12,
+              boxShadow: "0 4px 14px rgba(40,22,10,.08)",
+            }}
+          >
+            <T bold style={{ fontSize: 12, lineHeight: 18, color: "#292119" }}>
+              Começar a explorar
+            </T>
+            <ArrowRight size={17} color="#292119" />
+          </Pressable>
+        </LinearGradient>
+      )}
+      <ErrorBox
+        message={home.error || (query ? catalog.error : "")}
+        retry={() => void home.reload().catch(() => {})}
       />
-      <Track
-        title="Feito pelos seus vizinhos"
-        products={(home.data?.products ?? []).slice(0, 10)}
+      {home.loading && !home.data && <Loading />}
+      <Section
+        title="Descubra o que tem por aqui"
+        action="Ver categorias"
+        onAction={explore}
       />
-      <Section title="Lojas em destaque" />
-      {home.data?.shops.map((shop) => (
-        <ShopRow shop={shop} key={shop.id} />
-      ))}
-      {home.data && !home.data.shops.length && (
+      <Categories categories={home.data?.categories ?? []} />
+      {!query && (
+        <>
+          <FairHomeTeaser />
+          {ads.data?.campaigns.length ? (
+            <AdsCarousel
+              key={ads.data.campaigns.map((ad) => ad.id).join(".")}
+              campaigns={ads.data.campaigns}
+            />
+          ) : (
+            !ads.loading && <WeeklyOffers />
+          )}
+          <Track title="Produtos em destaque" products={featured} />
+        </>
+      )}
+      <Section
+        title={query ? "Resultados da busca" : "Feito pelos seus vizinhos"}
+        action={query ? undefined : "Ver produtos"}
+        onAction={explore}
+      />
+      {query && catalog.loading && <Loading />}
+      <ProductGrid products={products} />
+      {!products.length && !(query ? catalog.loading : home.loading) && (
         <Empty
-          title="Sua vizinhança está chegando"
-          body="As lojas do condomínio aparecerão aqui."
+          title={query ? "Nada por aqui ainda" : "A vitrine está começando!"}
+          body={
+            query
+              ? "Tente outro termo ou explore as categorias."
+              : "As primeiras lojas e produtos vão aparecer aqui assim que forem aprovados."
+          }
         />
+      )}
+      {query && catalog.hasMore && (
+        <Button
+          title="Mostrar mais produtos"
+          busy={catalog.loading}
+          secondary
+          onPress={catalog.next}
+        />
+      )}
+      {!query && (
+        <>
+          <Section
+            title="Lojas em destaque"
+            action="Ver todas"
+            onAction={explore}
+          />
+          <View style={{ gap: 10 }}>
+            {home.data?.shops.slice(0, 8).map((shop) => (
+              <ShopRow shop={shop} key={shop.id} />
+            ))}
+          </View>
+          {home.data && !home.data.shops.length && (
+            <Empty
+              title="Nenhuma loja publicada"
+              body="As lojas do condomínio aparecerão aqui."
+            />
+          )}
+        </>
       )}
     </Screen>
   );
 }
-function Ad({
-  ad,
-}: {
-  ad: {
-    id: string;
-    merchant_name: string;
-    headline: string;
-    description: string;
-    location: string;
-    image_url: string | null;
-    destination_url: string;
-  };
-}) {
-  const { api } = useAuth();
-  const target = useRef<View>(null);
-  const dimensions = useWindowDimensions();
-  useEffect(() => {
-    let seen = false;
-    const timer = setInterval(() => {
-      if (seen || AppState.currentState !== "active") return;
-      target.current?.measureInWindow((x, y, width, height) => {
-        const visibleWidth = Math.max(
-          0,
-          Math.min(x + width, dimensions.width) - Math.max(0, x),
-        );
-        const visibleHeight = Math.max(
-          0,
-          Math.min(y + height, dimensions.height) - Math.max(0, y),
-        );
-        if (
-          width > 0 &&
-          height > 0 &&
-          visibleWidth * visibleHeight >= width * height * 0.5
-        ) {
-          seen = true;
-          void api
-            .request("ads/" + ad.id + "/impression", "POST")
-            .catch(() => {});
-        }
-      });
-    }, 750);
-    return () => clearInterval(timer);
-  }, [ad.id, api, dimensions.width, dimensions.height]);
+function WeeklyOffers() {
+  const { width } = useWindowDimensions();
   return (
-    <Pressable
-      ref={target}
-      style={{ width: 300, gap: 8 }}
-      onPress={() => {
-        void api.request("ads/" + ad.id + "/click", "POST").catch(() => {});
-        void openWeb(ad.destination_url).catch(alertError);
+    <View
+      style={{
+        backgroundColor: "#FFE4D2",
+        borderWidth: 1,
+        borderColor: "#FFD8BF",
+        padding: width <= 420 ? 17 : 24,
+        borderRadius: width <= 420 ? 21 : 26,
+        minHeight: width <= 420 ? 166 : 190,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
       }}
     >
-      <Picture path={ad.image_url} label={ad.headline} height={130} />
-      <T bold>{ad.headline}</T>
-      <T>{ad.merchant_name}</T>
-      <T>{ad.description}</T>
-      <T style={{ fontSize: 10, color: colors.muted }}>Patrocinado</T>
-    </Pressable>
+      <View style={{ flex: 1 }}>
+        <T bold style={{ fontSize: 10, letterSpacing: 0.75, color: "#A04B28" }}>
+          ACHADINHOS DA VIZINHANÇA
+        </T>
+        <T
+          heading
+          style={{
+            fontFamily: fonts.display,
+            fontSize: Math.min(26, Math.max(21, width * 0.06)),
+            lineHeight: 26,
+            color: "#3B281E",
+            marginVertical: 9,
+          }}
+        >
+          Ofertas da semana
+        </T>
+        <T
+          style={{
+            fontSize: width <= 420 ? 11 : 12,
+            lineHeight: 17,
+            color: "#805645",
+          }}
+        >
+          Confira o que seus vizinhos prepararam por aqui.
+        </T>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.navigate("/explorar")}
+          style={{
+            backgroundColor: "#2B241F",
+            borderRadius: 999,
+            paddingVertical: 9,
+            paddingHorizontal: 12,
+            minHeight: 42,
+            marginTop: 16,
+            flexDirection: "row",
+            alignItems: "center",
+            alignSelf: "flex-start",
+            gap: 7,
+          }}
+        >
+          <T bold style={{ color: "white", fontSize: 11 }}>
+            Conferir agora
+          </T>
+          <ArrowRight size={17} color="white" />
+        </Pressable>
+      </View>
+      <Image
+        source={require("../../assets/images/ofertas-semana.png")}
+        accessibilityLabel="Arte promocional das ofertas da semana"
+        style={{
+          width: width <= 420 ? "36%" : "38%",
+          height: width <= 420 ? 127 : 150,
+          backgroundColor: "rgba(255,255,255,.30)",
+          borderRadius: 24,
+        }}
+        resizeMode="contain"
+      />
+    </View>
   );
 }
 function Track({ title, products }: { title: string; products: Product[] }) {
@@ -268,7 +381,7 @@ function Track({ title, products }: { title: string; products: Product[] }) {
     <>
       <Section
         title={title}
-        action="Ver tudo"
+        action="Explorar"
         onAction={() => router.push("/explorar")}
       />
       <ScrollView
@@ -283,7 +396,13 @@ function Track({ title, products }: { title: string; products: Product[] }) {
     </>
   );
 }
-function CategoryGlyph({ category }: { category: Category }) {
+function CategoryGlyph({
+  category,
+  color,
+}: {
+  category: Category;
+  color: string;
+}) {
   const icons: Record<string, React.ElementType> = {
     "cake-slice": CakeSlice,
     sandwich: Sandwich,
@@ -302,7 +421,7 @@ function CategoryGlyph({ category }: { category: Category }) {
     smartphone: Smartphone,
   };
   const Icon = category.id ? (icons[category.icon] ?? ShoppingBag) : LayoutGrid;
-  return <Icon size={25} strokeWidth={1.8} color={colors.orange} />;
+  return <Icon size={25} strokeWidth={1.8} color={color} />;
 }
 function Categories({
   categories,
@@ -332,24 +451,32 @@ function Categories({
                     params: { categoria: c.id },
                   })
           }
-          style={{ width: 82, alignItems: "center", gap: 8 }}
+          accessibilityRole="button"
+          accessibilityState={{
+            selected: selected !== undefined && c.id === selected,
+          }}
+          style={{ width: 90, alignItems: "center", gap: 9 }}
         >
           <View
             style={{
-              width: 70,
-              height: 70,
+              width: 76,
+              height: 76,
               borderRadius: 40,
               alignItems: "center",
               justifyContent: "center",
-              backgroundColor:
-                c.id === selected
-                  ? colors.yellow
-                  : ["#FFF0DD", "#E8F2E3", "#EAE6F5", "#FFE8D7"][i % 4],
+              backgroundColor: ["#FFF0DD", "#E8F2E3", "#EAE6F5", "#FFE8D7"][
+                i % 4
+              ],
+              borderWidth: c.id === selected ? 2 : 0,
+              borderColor: colors.orange,
             }}
           >
-            <CategoryGlyph category={c} />
+            <CategoryGlyph
+              category={c}
+              color={["#DE6D50", "#628755", "#7974BC", "#C59114"][i % 4]}
+            />
           </View>
-          <T bold style={{ fontSize: 11, textAlign: "center" }}>
+          <T bold style={{ fontSize: 11, lineHeight: 13.75, textAlign: "center" }}>
             {c.name}
           </T>
         </Pressable>
@@ -357,88 +484,105 @@ function Categories({
     </ScrollView>
   );
 }
-export function Explore() {
-  const params = useLocalSearchParams<{
-    categoria?: string;
-    ofertas?: string;
-  }>();
-  const { home } = useMarket();
+function useCatalog(query: string, category: string, enabled = true) {
   const { api } = useAuth();
-  const [query, setQuery] = useState(""),
-    [pagination, setPagination] = useState({ filter: "", page: 0 }),
-    [result, setResult] = useState<{ filter: string; products: Product[] }>({
-      filter: "",
-      products: [],
-    }),
-    [hasMore, setMore] = useState(false),
-    [loading, setLoading] = useState(false),
-    [error, setError] = useState("");
-  const category = params.categoria ?? "",
-    filter = query + "|" + category;
+  const [pagination, setPagination] = useState({ filter: "", page: 0 });
+  const [result, setResult] = useState<{ filter: string; products: Product[] }>(
+    { filter: "", products: [] },
+  );
+  const [request, setRequest] = useState({
+    filter: "",
+    loading: true,
+    error: "",
+    hasMore: false,
+  });
+  const filter = query + "|" + category;
   const page = pagination.filter === filter ? pagination.page : 0;
-  const products = result.filter === filter ? result.products : [];
-  const setCategory = (id: string) =>
-    router.setParams({ categoria: id, ofertas: "" });
   useEffect(() => {
+    if (!enabled) return;
     let active = true;
     const timer = setTimeout(() => {
-      setLoading(true);
-      const p = new URLSearchParams({
+      setRequest((previous) => ({
+        ...previous,
+        filter,
+        loading: true,
+        error: "",
+      }));
+      const params = new URLSearchParams({
         page: String(page),
         limit: "24",
         search: query,
         ...(category ? { category } : {}),
       });
       api
-        .request<{ products: Product[]; hasMore: boolean }>("catalog?" + p)
-        .then((r) => {
-          if (active) {
-            setResult((old) => ({
+        .request<{ products: Product[]; hasMore: boolean }>("catalog?" + params)
+        .then((response) => {
+          if (!active) return;
+          setResult((previous) => ({
+            filter,
+            products:
+              page && previous.filter === filter
+                ? [...previous.products, ...response.products]
+                : response.products,
+          }));
+          setRequest({
+            filter,
+            loading: false,
+            error: "",
+            hasMore: response.hasMore,
+          });
+        })
+        .catch((error) => {
+          if (active)
+            setRequest({
               filter,
-              products:
-                page && old.filter === filter
-                  ? [...old.products, ...r.products]
-                  : r.products,
-            }));
-            setMore(r.hasMore);
-            setError("");
-          }
-        })
-        .catch((e) => {
-          if (active) setError(e.message);
-        })
-        .finally(() => {
-          if (active) setLoading(false);
+              loading: false,
+              error: error.message,
+              hasMore: false,
+            });
         });
     }, 300);
     return () => {
       active = false;
       clearTimeout(timer);
     };
-  }, [query, category, page, api, filter]);
+  }, [api, query, category, filter, page, enabled]);
+  return {
+    products: result.filter === filter ? result.products : [],
+    loading: enabled && (request.filter !== filter || request.loading),
+    error: request.filter === filter ? request.error : "",
+    hasMore: request.filter === filter && request.hasMore,
+    next: () => setPagination({ filter, page: page + 1 }),
+  };
+}
+export function Explore() {
+  const params = useLocalSearchParams<{
+    categoria?: string;
+    ofertas?: string;
+  }>();
+  const { home } = useMarket();
+  const [query, setQuery] = useState("");
+  const category = params.categoria ?? "";
+  const catalog = useCatalog(query, category);
+  const { loading, error, hasMore } = catalog;
+  const products = catalog.products.filter(
+    (p) => !params.ofertas || p.promo_price_cents != null,
+  );
+  const setCategory = (id: string) =>
+    router.setParams({ categoria: id, ofertas: "" });
   return (
     <Screen title="Explorar">
       <T heading style={{ fontSize: 28 }}>
         Explorar
       </T>
-      <Field
-        label="Buscar por produto ou loja"
-        value={query}
-        onChangeText={setQuery}
-      />
+      <SearchBox value={query} onChangeText={setQuery} />
       <Categories
         categories={home.data?.categories ?? []}
         selected={category}
         onSelect={setCategory}
       />
       <ErrorBox message={error} />
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
-        {products
-          .filter((p) => !params.ofertas || p.promo_price_cents != null)
-          .map((p) => (
-            <ProductCard key={p.id} product={p} />
-          ))}
-      </View>
+      <ProductGrid products={products} />
       {loading ? (
         <Loading />
       ) : (
@@ -454,7 +598,7 @@ export function Explore() {
           title="Mostrar mais produtos"
           busy={loading}
           secondary
-          onPress={() => setPagination({ filter, page: page + 1 })}
+          onPress={catalog.next}
         />
       )}
       <Section title="Todas as lojas" />
@@ -478,11 +622,7 @@ export function Favorites() {
       {favorites.loading ? (
         <Loading />
       ) : (
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
-          {favorites.data?.products.map((p) => (
-            <ProductCard key={p.id} product={p} />
-          ))}
-        </View>
+        <ProductGrid products={favorites.data?.products ?? []} />
       )}
       {favorites.data && !favorites.data.products.length && (
         <Empty
@@ -502,13 +642,18 @@ export function ShopDetail() {
   const shop = resource.data?.shop;
   const reviews = useResource<{
     summary: { average: number | null; count: number };
-    reviews: { id: string; rating: number; description: string }[];
+    reviews: {
+      id: string;
+      rating: number;
+      description: string;
+      created_at: string;
+    }[];
   }>(shop ? "shops/" + shop.id + "/reviews" : null);
   const subscription = useResource<{ subscribed: boolean }>(
     shop ? "push/shops/" + shop.id : null,
   );
   return (
-    <Screen title="Loja" back>
+    <Screen title="Loja" back backLabel="Voltar às lojas">
       <ErrorBox
         message={resource.error}
         retry={() => void resource.reload().catch(() => {})}
@@ -516,83 +661,320 @@ export function ShopDetail() {
       {resource.loading && <Loading />}
       {shop && (
         <>
-          <Picture path={shop.cover_image} label={shop.name} height={180} />
-          <T heading style={{ fontSize: 29, lineHeight: 35 }}>
-            {shop.name}
-          </T>
-          <T>{shop.description}</T>
-          <T bold style={{ color: shop.is_open ? colors.green : colors.muted }}>
-            {shop.is_open ? "Aceitando pedidos" : "Fechada"}
-          </T>
-          <T>
-            {shop.delivery_enabled
-              ? "Entrega no condomínio · " + money(shop.delivery_fee_cents)
-              : ""}
-            {shop.pickup_enabled ? " · Retirada" : ""}
-          </T>
-          {shop.lead_time ? <T>{shop.lead_time}</T> : null}
-          <T>
-            {shop.payment_methods.map((m) => PAYMENT_LABELS[m]).join(" · ")}
-          </T>
-          <Button
-            title="Compartilhar loja"
-            secondary
-            onPress={() =>
-              void Share.share({
-                message: shop.name + " — " + api.web("/loja/" + shop.slug),
-              }).catch(alertError)
-            }
-          />
-          <Button
-            title={
-              subscription.data?.subscribed
-                ? "Desativar avisos desta loja"
-                : "Receber avisos desta loja"
-            }
-            secondary
-            onPress={() =>
-              void api
-                .request(
-                  "push/shops/" + shop.id,
-                  subscription.data?.subscribed ? "DELETE" : "PUT",
-                )
-                .then(() => subscription.reload())
-                .catch(alertError)
-            }
-          />
-          <Button
-            title="Denunciar loja"
-            secondary
-            onPress={() =>
-              router.push({
-                pathname: "/denunciar",
-                params: { tipo: "shop", id: shop.id },
-              })
-            }
-          />
-          <T bold>
-            ★{" "}
-            {reviews.data?.summary.count
-              ? `${reviews.data.summary.average} · ${reviews.data.summary.count} avaliações`
-              : "Ainda sem avaliações"}
-          </T>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
-            {resource.data?.products.map((p) => (
-              <ProductCard
-                key={p.id}
-                product={{ ...p, shop_name: shop.name }}
-              />
-            ))}
+          <View>
+            <Picture
+              path={shop.cover_image}
+              label={"Capa " + shop.name}
+              height={175}
+              radius={22}
+              fallback={
+                <LinearGradient
+                  colors={["#FBE248", "#FFE9AC"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0.6 }}
+                  style={{
+                    flex: 1,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Store size={62} color="#AB8538" />
+                </LinearGradient>
+              }
+            />
+            <View
+              style={{
+                marginTop: -43,
+                marginLeft: 17,
+                marginBottom: 10,
+                borderWidth: 4,
+                borderColor: "#FFFDFA",
+                borderRadius: 44,
+                width: 88,
+                height: 88,
+                backgroundColor: "#FFEFCA",
+                boxShadow: "0 7px 21px rgba(51,35,12,.1)",
+              }}
+            >
+              <ShopLogo shop={shop} size={80} />
+            </View>
           </View>
-          {reviews.data?.reviews.map((r) => (
-            <Card key={r.id}>
-              <T bold>{"★".repeat(r.rating)}</T>
-              <T>{r.description}</T>
-            </Card>
-          ))}
+          <View style={{ gap: 18 }}>
+            <View>
+              <T heading style={{ fontSize: 27, lineHeight: 32 }}>
+                {shop.name}
+              </T>
+              <T style={{ fontSize: 13, color: colors.muted, marginTop: 7 }}>
+                {shop.description}
+              </T>
+            </View>
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: 9,
+              }}
+            >
+              <View
+                style={{
+                  borderRadius: 99,
+                  paddingVertical: 5,
+                  paddingHorizontal: 9,
+                  backgroundColor: shop.is_open ? "#E3F4EB" : "#ECEEEA",
+                }}
+              >
+                <T
+                  bold
+                  style={{
+                    fontSize: 10,
+                    lineHeight: 15,
+                    color: shop.is_open ? "#166D4A" : "#555555",
+                  }}
+                >
+                  {shop.is_open ? "Aceitando pedidos" : "Fechada"}
+                </T>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() =>
+                  void Share.share({
+                    message: shop.name + " — " + api.web("/loja/" + shop.slug),
+                  }).catch(alertError)
+                }
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  minHeight: 39,
+                  borderWidth: 1,
+                  borderColor: "#EAD7BF",
+                  borderRadius: 999,
+                  backgroundColor: "#FFF6DF",
+                  paddingVertical: 9,
+                  paddingHorizontal: 13,
+                }}
+              >
+                <Share2 size={17} color="#5D4325" />
+                <T bold style={{ fontSize: 12, color: "#5D4325" }}>
+                  Compartilhar loja
+                </T>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() =>
+                  router.push({
+                    pathname: "/denunciar",
+                    params: { tipo: "shop", id: shop.id },
+                  })
+                }
+                style={{ paddingVertical: 8 }}
+              >
+                <T style={{ fontSize: 11, color: colors.muted }}>
+                  Denunciar loja
+                </T>
+              </Pressable>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              disabled={subscription.loading || !!subscription.error}
+              onPress={() =>
+                void api
+                  .request(
+                    "push/shops/" + shop.id,
+                    subscription.data?.subscribed ? "DELETE" : "PUT",
+                  )
+                  .then(() => subscription.reload())
+                  .catch(alertError)
+              }
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 7,
+                alignSelf: "flex-start",
+                minHeight: 39,
+                borderRadius: 99,
+                borderWidth: 1,
+                borderColor: colors.line,
+                paddingVertical: 9,
+                paddingHorizontal: 13,
+                opacity: subscription.loading ? 0.5 : 1,
+              }}
+            >
+              <Bell size={16} color={colors.ink} />
+              <T bold style={{ fontSize: 12, flexShrink: 1 }}>
+                {subscription.data?.subscribed
+                  ? "Desativar avisos desta loja"
+                  : "Receber avisos desta loja"}
+              </T>
+            </Pressable>
+            <ErrorBox
+              message={subscription.error}
+              retry={() => void subscription.reload().catch(() => {})}
+            />
+          </View>
+          <View
+            accessibilityLabel="Avaliação da loja"
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: 7,
+              paddingVertical: 14,
+              borderTopWidth: 1,
+              borderBottomWidth: 1,
+              borderColor: "#E8E2D7",
+            }}
+          >
+            <RoundedStars
+              value={reviews.data?.summary.average ?? 0}
+              size={22}
+            />
+            {reviews.data?.summary.count ? (
+              <>
+                <T bold style={{ fontSize: 15 }}>
+                  {(reviews.data.summary.average ?? 0).toLocaleString("pt-BR", {
+                    minimumFractionDigits: 1,
+                    maximumFractionDigits: 1,
+                  })}{" "}
+                  de 5
+                </T>
+                <T style={{ fontSize: 12, color: "#797368" }}>
+                  ({reviews.data.summary.count}{" "}
+                  {reviews.data.summary.count === 1
+                    ? "avaliação"
+                    : "avaliações"}
+                  )
+                </T>
+              </>
+            ) : (
+              <T style={{ fontSize: 12, color: "#797368" }}>
+                {reviews.loading
+                  ? "Carregando avaliações..."
+                  : reviews.error
+                    ? "Avaliações indisponíveis"
+                    : "Sem avaliação"}
+              </T>
+            )}
+          </View>
+          <View
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              gap: 13,
+              borderBottomWidth: 1,
+              borderColor: colors.line,
+              paddingBottom: 16,
+            }}
+          >
+            <Benefit
+              Icon={Truck}
+              label={
+                shop.delivery_enabled ? "Entrega disponível" : "Sem entrega"
+              }
+            />
+            {shop.pickup_enabled && (
+              <Benefit Icon={ShoppingBag} label="Retirada" />
+            )}
+            {!!shop.lead_time && (
+              <Benefit Icon={Clock3} label={shop.lead_time} />
+            )}
+          </View>
+          <Section title="Produtos da loja" />
+          <ProductGrid
+            products={(resource.data?.products ?? []).map((p) => ({
+              ...p,
+              shop_name: shop.name,
+            }))}
+          />
+          {!resource.data?.products.length && (
+            <Empty
+              title="Loja sem produtos no momento"
+              body="Em breve, novidades por aqui."
+            />
+          )}
+          <Section title="Avaliações dos moradores" />
+          <ErrorBox
+            message={reviews.error}
+            retry={() => void reviews.reload().catch(() => {})}
+          />
+          {reviews.loading ? (
+            <Loading />
+          ) : reviews.data?.reviews.length ? (
+            reviews.data.reviews.map((review) => (
+              <Card
+                key={review.id}
+                style={{
+                  borderColor: "#EBE3D5",
+                  backgroundColor: "#FFFDFA",
+                  borderRadius: 19,
+                  paddingVertical: 16,
+                  paddingHorizontal: 17,
+                  gap: 9,
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
+                  }}
+                >
+                  <RoundedStars value={review.rating} size={19} />
+                  <T style={{ fontSize: 11, color: "#877F70" }}>
+                    {new Date(review.created_at).toLocaleDateString("pt-BR")}
+                  </T>
+                </View>
+                <T style={{ fontSize: 13, lineHeight: 21 }}>
+                  {review.description}
+                </T>
+                <T style={{ fontSize: 11, color: "#877F70" }}>
+                  Compra verificada · Morador do condomínio
+                </T>
+              </Card>
+            ))
+          ) : (
+            !reviews.error && (
+              <Card
+                style={{
+                  paddingVertical: 29,
+                  paddingHorizontal: 15,
+                  alignItems: "center",
+                  gap: 8,
+                  borderStyle: "dashed",
+                  borderColor: "#DED8C9",
+                  borderRadius: 22,
+                  backgroundColor: "#FFFDFA",
+                }}
+              >
+                <RoundedStars value={0} size={24} />
+                <T bold>Sem avaliação</T>
+                <T
+                  style={{
+                    fontSize: 12,
+                    color: "#898175",
+                    textAlign: "center",
+                  }}
+                >
+                  As avaliações dos compradores aparecerão aqui após moderação.
+                </T>
+              </Card>
+            )
+          )}
         </>
       )}
     </Screen>
+  );
+}
+function Benefit({ Icon, label }: { Icon: typeof Truck; label: string }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+      <Icon size={17} color="#168257" />
+      <T style={{ fontSize: 12, color: "#5C6259" }}>{label}</T>
+    </View>
   );
 }
 export function ProductDetail() {
@@ -623,7 +1005,12 @@ export function ProductDetail() {
       {r.loading && <Loading />}
       {p && shop ? (
         <>
-          <Picture path={p.image_url} label={p.name} height={290} />
+          <Picture
+            path={p.image_url}
+            label={p.name}
+            aspectRatio={1.15}
+            radius={25}
+          />
           <T heading style={{ fontSize: 30, lineHeight: 36 }}>
             {p.name}
           </T>

@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { Alert, Pressable, View } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
+import { CalendarDays } from "lucide-react-native";
+import { FairArt, fairDate } from "../components/FairCards";
 import { useAuth } from "../auth";
 import { useResource } from "../hooks";
 import {
@@ -11,7 +13,7 @@ import {
   Field,
   Loading,
   Picture,
-  ProductCard,
+  ProductGrid,
   Screen,
   T,
   alertError,
@@ -19,45 +21,80 @@ import {
 import { colors } from "../theme";
 import { uploadPicture } from "../upload";
 import { openWhatsApp } from "../external";
-import type { Product } from "../types";
+import type { Product, CommunityFair } from "../types";
+export function Fairs() {
+  const resource = useResource<{ fairs: CommunityFair[] }>("fairs");
+  return (
+    <Screen title="Feiras do condomínio" back>
+      <View style={{ gap: 6 }}>
+        <T heading style={{ fontSize: 27 }}>
+          Feiras do condomínio
+        </T>
+        <T style={{ color: colors.muted }}>
+          Produtos escolhidos pela comunidade, vendidos diretamente pelas lojas
+          participantes.
+        </T>
+      </View>
+      <ErrorBox
+        message={resource.error}
+        retry={() => void resource.reload().catch(() => {})}
+      />
+      {resource.loading && <Loading />}
+      {resource.data?.fairs.map((fair) => (
+        <Card key={fair.id} style={{ padding: 16, borderRadius: 16 }}>
+          <FairArt fair={fair} />
+          <T heading style={{ fontSize: 22 }}>
+            {fair.title}
+          </T>
+          <T>{fair.description}</T>
+          <T style={{ color: colors.muted }}>Até {fairDate(fair.ends_at)}</T>
+          <Button
+            title="Explorar feira"
+            onPress={() =>
+              router.push({ pathname: "/feira/[id]", params: { id: fair.id } })
+            }
+          />
+        </Card>
+      ))}
+      {resource.data && !resource.data.fairs.length && (
+        <T style={{ color: colors.muted }}>
+          Nenhuma feira acontecendo no momento.
+        </T>
+      )}
+    </Screen>
+  );
+}
 export function Fair() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const r = useResource<{
-    fair: {
-      title: string;
-      description: string;
-      cover_image_url: string | null;
-    };
-    products: Product[];
-  }>("fairs/" + id);
+  const resource = useResource<{ fair: CommunityFair; products: Product[] }>(
+    "fairs/" + id,
+  );
   return (
-    <Screen title="Feira do condomínio" back>
+    <Screen title="Feiras do condomínio" back backLabel="Ver todas as feiras">
       <ErrorBox
-        message={r.error}
-        retry={() => void r.reload().catch(() => {})}
+        message={resource.error}
+        retry={() => void resource.reload().catch(() => {})}
       />
-      {r.loading && <Loading />}
-      {r.data && (
+      {resource.loading && <Loading />}
+      {resource.data && (
         <>
-          <Picture
-            path={r.data.fair.cover_image_url}
-            label={r.data.fair.title}
-            height={180}
-          />
+          <FairArt fair={resource.data.fair} />
           <T heading style={{ fontSize: 27 }}>
-            {r.data.fair.title}
+            {resource.data.fair.title}
           </T>
-          <T>{r.data.fair.description}</T>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
-            {r.data.products.map((p) => (
-              <ProductCard key={p.id} product={p} />
-            ))}
+          <T>{resource.data.fair.description}</T>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <CalendarDays size={15} color={colors.muted} />
+            <T style={{ color: colors.muted, flex: 1 }}>
+              {fairDate(resource.data.fair.starts_at)} até{" "}
+              {fairDate(resource.data.fair.ends_at)}
+            </T>
           </View>
-          {!r.data.products.length && (
-            <Empty
-              title="A feira está sendo preparada"
-              body="Volte em breve para conferir os produtos."
-            />
+          <ProductGrid products={resource.data.products} />
+          {!resource.data.products.length && (
+            <T style={{ color: colors.muted }}>
+              Ainda não há produtos disponíveis nesta feira.
+            </T>
           )}
         </>
       )}

@@ -22,3 +22,11 @@ jobs:
       - run: npm test
       - run: npx expo install --check
       - run: npm run export:check
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:ui
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mobile-preview-qa
+          path: test-results/
+          retention-days: 7
