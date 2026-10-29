@@ -46,6 +46,9 @@ export async function uploadPicture(
       name: "foto.jpg",
       type: "image/jpeg",
     } as unknown as Blob);
-  const r = await api.request<{ url: string }>("media/" + kind, "POST", form);
+  const route = kind === "profile" ? "media/profile" : "media/giveaway";
+  const r = Platform.OS === "web"
+    ? await api.request<{ url: string }>(route, "POST", form)
+    : await api.upload<{ url: string }>(route, form);
   return r.url;
 }

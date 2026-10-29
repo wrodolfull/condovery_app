@@ -99,6 +99,35 @@ export class ApiClient {
       clearTimeout(timer);
     }
   }
+  /** Native multipart upload. React Native's XHR transports file:// FormData
+   * reliably on Android, without serializing the file as JSON or exposing credentials. */
+  upload<T>(path: "media/profile" | "media/giveaway", form: FormData): Promise<T> {
+    if (!this.token || !this.origin)
+      return Promise.reject(new Error("Entre na sua conta antes de enviar uma imagem."));
+    return new Promise<T>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", this.origin + "/api/" + path);
+      xhr.timeout = 60000;
+      xhr.setRequestHeader("Accept", "application/json");
+      xhr.setRequestHeader("Authorization", "Bearer " + this.token);
+      // Do not supply Content-Type: native FormData must generate its boundary.
+      xhr.onload = () => {
+        let payload: { error?: string } & Partial<T> = {};
+        try { payload = JSON.parse(xhr.responseText || "{}"); } catch {}
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(payload as T);
+        } else {
+          if (xhr.status === 401) this.expired();
+          reject(new ApiError(payload.error || "Não foi possível enviar a imagem.", xhr.status));
+        }
+      };
+      xhr.onerror = () => reject(new Error(
+        "Não foi possível enviar a imagem. Verifique a conexão com o servidor.",
+      ));
+      xhr.ontimeout = () => reject(new Error("O envio da imagem demorou demais. Tente novamente."));
+      xhr.send(form);
+    });
+  }
   image(path: string | null | undefined, scope: string) {
     if (!path || !/^\/api\/media\/[0-9a-f-]{36}$/i.test(path) || !this.token)
       return null;
