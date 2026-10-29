@@ -572,30 +572,37 @@ function useShopDirectory(query: string) {
   const [request,setRequest]=useState({filter:"",loading:true,error:""});
   const [retry,setRetry]=useState(0);
   const cursor=pagination.filter===filter?pagination.cursor:null;
-  useEffect(()=>{setPagination({filter,cursor:null});},[filter]);
+  // Reset pagination when switching tenants or search terms; schedule outside render.
   useEffect(()=>{
-    if(!viewer||viewer.status!=="approved")return;
+    const timer=setTimeout(()=>setPagination({filter,cursor:null}),0);
+    return()=>clearTimeout(timer);
+  },[filter]);
+  const enabled=viewer?.status==="approved";
+  useEffect(()=>{
+    if(!enabled)return;
     let active=true;
-    setRequest({filter,loading:true,error:""});
-    const params=new URLSearchParams({limit:"24"});
-    if(query.trim())params.set("search",query.trim());
-    if(cursor)params.set("cursor",cursor);
-    api.request<{shops:Shop[];nextCursor:string|null;hasMore:boolean}>("shops?"+params)
-      .then(response=>{
-        if(!active)return;
-        setResult(previous=>({
-          filter,
-          shops:cursor&&previous.filter===filter?appendUniqueShops(previous.shops,response.shops):response.shops,
-          nextCursor:response.nextCursor,
-          hasMore:response.hasMore
-        }));
-        setRequest({filter,loading:false,error:""});
-      })
-      .catch(error=>{
-        if(active)setRequest({filter,loading:false,error:error instanceof Error?error.message:"Não foi possível carregar as lojas."});
-      });
-    return()=>{active=false};
-  },[api,viewer?.status,filter,query,cursor,retry]);
+    const timer=setTimeout(()=>{
+      setRequest({filter,loading:true,error:""});
+      const params=new URLSearchParams({limit:"24"});
+      if(query.trim())params.set("search",query.trim());
+      if(cursor)params.set("cursor",cursor);
+      api.request<{shops:Shop[];nextCursor:string|null;hasMore:boolean}>("shops?"+params)
+        .then(response=>{
+          if(!active)return;
+          setResult(previous=>({
+            filter,
+            shops:cursor&&previous.filter===filter?appendUniqueShops(previous.shops,response.shops):response.shops,
+            nextCursor:response.nextCursor,
+            hasMore:response.hasMore
+          }));
+          setRequest({filter,loading:false,error:""});
+        })
+        .catch(error=>{
+          if(active)setRequest({filter,loading:false,error:error instanceof Error?error.message:"Não foi possível carregar as lojas."});
+        });
+    },80);
+    return()=>{active=false;clearTimeout(timer)};
+  },[api,enabled,filter,query,cursor,retry]);
   const valid=result.filter===filter;
   const loading=request.filter!==filter||request.loading;
   return {
