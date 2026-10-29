@@ -344,7 +344,7 @@ for (const width of [360, 390, 430]) {
     await checkNav(page,"Salvos");
     await expect(page.getByRole("button", { name: "Ver Bolo de cenoura", exact: true }).filter({ visible: true })).toHaveCount(1);
     await page.getByRole("button", { name: "Remover dos favoritos", exact: true }).filter({ visible: true }).click();
-    await expect(page.getByText("Seu próximo favorito mora aqui", { exact: true })).toBeVisible();
+    await expect(page.getByText("Seu próximo favorito mora aqui", { exact: true }).filter({ visible: true })).toBeVisible();
     await page.getByRole("tab", { name: "Pedidos", exact: true }).click();
     await checkNav(page, "Pedidos");
     await page.getByRole("tab", { name: "Conta", exact: true }).click();
@@ -364,7 +364,7 @@ test("closed stores show disabled, grey product cards without purchase navigatio
   await expect(page.getByRole("button",{name:"Ver Bolo de cenoura",exact:true}).first()).toBeDisabled();
   await page.getByRole("tab",{name:"Explorar",exact:true}).click();
   await page.getByRole("button",{name:"Ver loja Loja do Vizinho",exact:true}).filter({visible:true}).click();
-  await expect(page.getByText("Loja fechada",{exact:true}).first()).toBeVisible();
+  await expect(page.getByText("Loja fechada",{exact:true}).filter({visible:true}).first()).toBeVisible();
   await expect(page.getByRole("button",{name:"Ver Bolo de cenoura",exact:true}).first()).toBeDisabled();
   await expect(page.getByText("Compras temporariamente indisponíveis.",{exact:false}).first()).toBeVisible();
   expect(errors).toEqual([]);
