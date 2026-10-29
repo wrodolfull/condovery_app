@@ -433,7 +433,7 @@ export function ProductCard({
   width,
 }: {
   product: Product;
-  width?: number;
+  width?: number | "100%";
 }) {
   const market = useMarket();
   const fav = market.favorites.data?.ids.includes(p.id);
@@ -570,31 +570,27 @@ export function ProductCard({
   );
 }
 export function ProductGrid({ products }: { products: Product[] }) {
-  const dimensions = useWindowDimensions();
-  const [measured, setMeasured] = useState<{
-    viewport: number;
-    width: number;
-  } | null>(null);
-  const width =
-    measured?.viewport === dimensions.width
-      ? measured.width
-      : dimensions.width - (dimensions.width <= 420 ? 30 : 40);
+  // Use explicit two-item rows, not flexWrap with measured pixel widths.
+  // Yoga can round two half-width cards + gap over the available space on
+  // Android and unexpectedly wrap every second card onto a new line.
+  const rows: Product[][] = [];
+  for (let i = 0; i < products.length; i += 2) {
+    rows.push(products.slice(i, i + 2));
+  }
   return (
-    <View
-      onLayout={(event) =>
-        setMeasured({
-          viewport: dimensions.width,
-          width: event.nativeEvent.layout.width,
-        })
-      }
-      style={{ width: "100%", flexDirection: "row", flexWrap: "wrap", gap: 15 }}
-    >
-      {products.map((p) => (
-        <ProductCard
-          key={p.id}
-          product={p}
-          width={Math.max(0, (width - 15) / 2)}
-        />
+    <View style={{ width: "100%", gap: 15 }}>
+      {rows.map((items) => (
+        <View
+          key={items[0].id}
+          style={{ width: "100%", flexDirection: "row", gap: 15 }}
+        >
+          {items.map((p) => (
+            <View key={p.id} style={{ flex: 1, minWidth: 0 }}>
+              <ProductCard product={p} width="100%" />
+            </View>
+          ))}
+          {items.length === 1 && <View style={{ flex: 1, minWidth: 0 }} />}
+        </View>
       ))}
     </View>
   );
