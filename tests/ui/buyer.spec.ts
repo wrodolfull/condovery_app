@@ -496,7 +496,7 @@ test("sign-up checks condominium invitation before enabling account creation", a
   await page.getByRole("button", { name: "Verificar condomínio" }).click();
   await expect(page.getByText("Condomínio Teste")).toBeVisible();
   await page.getByLabel("Nome", { exact: true }).fill("Morador Teste");
-  await page.getByLabel("E-mail", { exact: true }).fill("teste@example.com");
+  await page.getByLabel("E-mail", { exact: true }).last().fill("teste@example.com");
   await page.getByLabel("WhatsApp com DDD").fill("11999991234");
   await page.getByRole("radio", { name: "Torre A" }).click();
   await page.getByLabel("Apartamento").fill("101");
