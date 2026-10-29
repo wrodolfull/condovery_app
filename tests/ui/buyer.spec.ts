@@ -382,6 +382,33 @@ test("closed stores show disabled, grey product cards without purchase navigatio
   expect(errors).toEqual([]);
 });
 
+test("order history loads records beyond the first 20 without losing older pages",async({page})=>{
+  const {errors}=await enter(page);
+  const requested:string[]=[];
+  await page.route("**/api/orders?*",async route=>{
+    const url=new URL(route.request().url());
+    const cursor=url.searchParams.get("cursor")??"";
+    requested.push(cursor);
+    const all=Array.from({length:25},(_,i)=>({
+      id:id(200+i),code:25-i,status:"completed",total_cents:1000,subtotal_cents:1000,
+      delivery_fee_cents:0,shop_name:"Loja de Teste",tower:"Torre A",apartment:"101",
+      fulfillment:"pickup",delivery_day:null,delivery_window:"",
+      delivery_instructions:[],note:"",can_review:false,created_at:"2026-10-29T12:00:00Z",items:[]
+    }));
+    const start=cursor?all.findIndex(o=>String(o.code)===cursor)+1:0;
+    const rows=all.slice(start,start+20);
+    const hasMore=start+20<all.length;
+    await route.fulfill({json:{orders:rows,hasMore,nextCursor:hasMore?String(rows.at(-1)!.code):null},
+      headers:{"Access-Control-Allow-Origin":"*"}});
+  });
+  await page.getByRole("tab",{name:"Pedidos",exact:true}).click();
+  await expect(page.getByText("Pedido #25 · Loja de Teste")).toBeVisible();
+  await page.getByRole("button",{name:"Ver pedidos anteriores"}).click();
+  await expect(page.getByRole("button",{name:"Ver pedidos anteriores"})).toHaveCount(0);
+  expect(requested).toContain("6");
+  expect(errors).toEqual([]);
+});
+
 test("ads, fairs and inline home search use the same marketplace structure", async ({
   page,
 }, info) => {
