@@ -235,7 +235,7 @@ async function enter(page: Page, withAds = true, withFairs = true, extendedCatal
     await route.fulfill({ json: value, headers });
   });
   await page.goto(origin);
-  await page.getByLabel("E-mail", { exact: true }).fill("teste@example.com");
+  await page.getByLabel("E-mail", { exact: true }).filter({ visible: true }).fill("teste@example.com");
   await page.getByLabel("Senha", { exact: true }).fill("Password123!");
   await page.getByText("Entrar com e-mail", { exact: true }).click();
   await expect(
@@ -441,8 +441,17 @@ test("catalog requests subsequent pages without mounting every item", async ({
   });
   await enter(page, true, true, true);
   await page.getByRole("tab", { name: "Explorar" }).click();
-  await expect(page.getByRole("button", { name: "Mostrar mais produtos" })).toBeVisible();
-  await page.getByRole("button", { name: "Mostrar mais produtos" }).click();
+  const more = page.getByRole("button", { name: "Mostrar mais produtos" });
+  const catalog = page.getByLabel("Catálogo e lojas");
+  // The button is intentionally virtualized until its row approaches the viewport.
+  for (let i = 0; i < 20 && !(await more.count()); i++) {
+    await catalog.evaluate((element) => {
+      element.scrollTop += 420;
+    });
+    await page.waitForTimeout(70);
+  }
+  await expect(more).toBeVisible();
+  await more.click();
   await expect.poll(() => requestedPages.includes("1")).toBe(true);
   await expect(page.getByRole("button", { name: "Mostrar mais produtos" })).toHaveCount(0);
   await checkNav(page, "Explorar");
@@ -491,7 +500,7 @@ test("sign-up checks condominium invitation before enabling account creation", a
   await page.getByLabel("WhatsApp com DDD").fill("11999991234");
   await page.getByRole("radio", { name: "Torre A" }).click();
   await page.getByLabel("Apartamento").fill("101");
-  await page.getByLabel("Senha", { exact: true }).fill("SenhaForte123!");
+  await page.getByLabel("Senha", { exact: true }).filter({ visible: true }).fill("SenhaForte123!");
   await expect(create).toBeEnabled();
   await create.click();
   await expect(page.getByText("Conta criada! Confirme seu e-mail.")).toBeVisible();
