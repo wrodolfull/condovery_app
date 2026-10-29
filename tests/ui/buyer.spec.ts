@@ -382,6 +382,34 @@ test("closed stores show disabled, grey product cards without purchase navigatio
   expect(errors).toEqual([]);
 });
 
+test("buyer can refresh an order status without leaving the orders tab",async({page})=>{
+  const {errors}=await enter(page);
+  let requests=0;
+  await page.route("**/api/orders?*",async route=>{
+    requests++;
+    const order={
+      id:"99999999-2222-4333-8444-555555555555",
+      code:347,status:requests===1?"awaiting_confirmation":"confirmed",
+      total_cents:2750,subtotal_cents:2750,delivery_fee_cents:0,
+      shop_name:"Loja do Vizinho",tower:"Torre A",apartment:"101",
+      fulfillment:"pickup",delivery_day:null,delivery_window:"",
+      delivery_instructions:[],note:"",can_review:false,
+      created_at:"2026-10-29T12:00:00Z",items:[]
+    };
+    await route.fulfill({
+      json:{orders:[order],nextCursor:null,hasMore:false},
+      headers:{"Access-Control-Allow-Origin":"*"}
+    });
+  });
+  await page.getByRole("tab",{name:"Pedidos",exact:true}).click();
+  await expect(page.getByText("Pedido #347 · Loja do Vizinho")).toBeVisible();
+  await expect(page.getByText("Aguardando confirmação")).toBeVisible();
+  await page.getByRole("button",{name:"Atualizar",exact:true}).click();
+  await expect(page.getByText("Confirmado", {exact:true})).toBeVisible();
+  expect(requests).toBeGreaterThanOrEqual(2);
+  expect(errors).toEqual([]);
+});
+
 test("order history loads records beyond the first 20 without losing older pages",async({page})=>{
   const {errors}=await enter(page);
   const requested:string[]=[];
