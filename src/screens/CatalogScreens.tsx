@@ -554,7 +554,12 @@ function useCatalog(query: string, category: string, enabled = true) {
     loading: enabled && (request.filter !== filter || request.loading),
     error: request.filter === filter ? request.error : "",
     hasMore: request.filter === filter && request.hasMore,
-    next: () => setPagination({ filter, page: page + 1 }),
+    next: () => {
+      if (request.filter !== filter || request.loading || !request.hasMore) return;
+      // Lock synchronously: two rapid taps must not skip an API page.
+      setRequest((previous) => ({ ...previous, loading: true }));
+      setPagination({ filter, page: page + 1 });
+    },
   };
 }
 type ExploreRow =
@@ -658,26 +663,49 @@ export function Explore() {
 }
 export function Favorites() {
   const { favorites } = useMarket();
+  const { width } = useWindowDimensions();
+  const horizontal = width <= 420 ? 15 : 20;
+  const productWidth = Math.max(0, (width - horizontal * 2 - 15) / 2);
+  const products = favorites.data?.products ?? [];
   return (
-    <Screen title="Meus favoritos">
-      <T heading style={{ fontSize: 28 }}>
-        Meus favoritos
-      </T>
-      <ErrorBox
-        message={favorites.error}
-        retry={() => void favorites.reload().catch(() => {})}
+    <Screen title="Meus favoritos" scrollable={false}>
+      <FlatList
+        data={products}
+        keyExtractor={(item) => item.id}
+        numColumns={2}
+        columnWrapperStyle={{ gap: 15 }}
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        windowSize={5}
+        contentContainerStyle={{
+          paddingHorizontal: horizontal,
+          paddingTop: width <= 420 ? 20 : 24,
+          paddingBottom: 180,
+          gap: 15,
+        }}
+        ListHeaderComponent={
+          <View style={{ gap: 12 }}>
+            <T heading style={{ fontSize: 28 }}>Meus favoritos</T>
+            <ErrorBox
+              message={favorites.error}
+              retry={() => void favorites.reload().catch(() => {})}
+            />
+          </View>
+        }
+        ListEmptyComponent={
+          favorites.loading ? (
+            <Loading />
+          ) : favorites.error ? null : (
+            <Empty
+              title="Seu próximo favorito mora aqui"
+              body="Toque no coração de um produto para salvá-lo."
+            />
+          )
+        }
+        renderItem={({ item }) => (
+          <ProductCard product={item} width={productWidth} />
+        )}
       />
-      {favorites.loading ? (
-        <Loading />
-      ) : (
-        <ProductGrid products={favorites.data?.products ?? []} />
-      )}
-      {favorites.data && !favorites.data.products.length && (
-        <Empty
-          title="Seu próximo favorito mora aqui"
-          body="Toque no coração de um produto para salvá-lo."
-        />
-      )}
     </Screen>
   );
 }
