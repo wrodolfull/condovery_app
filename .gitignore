@@ -49,3 +49,7 @@ GoogleService-Info.plist
 *.p8
 *.jks
 *.keystore
+
+# Browser preview checks
+/test-results/
+/playwright-report/

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -8,20 +8,29 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
   type RefreshControlProps,
   type TextProps,
   type TextInputProps,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import { router, usePathname } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { router } from "expo-router";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 import {
   ArrowLeft,
   Bell,
   ChevronRight,
   Heart,
   Minus,
+  MapPin,
+  ShoppingBasket,
+  Search,
+  X,
   Plus,
   ShoppingBag,
   Store,
@@ -41,7 +50,7 @@ export function T({
       {...props}
       style={[
         {
-          fontFamily: heading ? fonts.heading : bold ? fonts.bold : fonts.body,
+          fontFamily: heading ? fonts.display : bold ? fonts.bold : fonts.body,
           color: colors.ink,
           fontSize: 14,
           lineHeight: heading ? undefined : 21,
@@ -103,6 +112,59 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
     </View>
   );
 }
+export function SearchBox({
+  value,
+  onChangeText,
+}: {
+  value: string;
+  onChangeText: (value: string) => void;
+}) {
+  return (
+    <View
+      style={{
+        height: 54,
+        backgroundColor: "#FFFEFB",
+        borderWidth: 1,
+        borderColor: "#EDE6DC",
+        borderRadius: 28,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+        paddingHorizontal: 17,
+        boxShadow: "0 8px 22px rgba(58,45,25,.04)",
+      }}
+    >
+      <Search size={20} color="#71756F" />
+      <TextInput
+        accessibilityLabel="Buscar produtos ou lojas"
+        placeholder="Busque produtos ou lojas..."
+        placeholderTextColor={colors.muted}
+        value={value}
+        onChangeText={onChangeText}
+        style={{
+          flex: 1,
+          minWidth: 0,
+          height: "100%",
+          fontSize: 14,
+          fontFamily: fonts.body,
+          outlineWidth: 0,
+          color: colors.ink,
+        }}
+        returnKeyType="search"
+      />
+      {!!value && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Limpar busca"
+          onPress={() => onChangeText("")}
+          hitSlop={10}
+        >
+          <X size={16} color={colors.ink} />
+        </Pressable>
+      )}
+    </View>
+  );
+}
 export function ErrorBox({
   message,
   retry,
@@ -144,127 +206,202 @@ export function Screen({
   children,
   title,
   back = false,
+  backLabel = "Voltar",
   refreshControl,
 }: {
   children: React.ReactNode;
   title?: string;
   back?: boolean;
+  backLabel?: string;
   refreshControl?: React.ReactElement<RefreshControlProps>;
 }) {
   const { viewer } = useAuth();
-  const pathname = usePathname();
+  const { cart } = useMarket();
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const count = cart.items.reduce((sum, item) => sum + item.quantity, 0);
+  const horizontal = width <= 420 ? 15 : 20;
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: colors.bg }}
       edges={["top", "left", "right"]}
     >
-      <View style={s.header}>
-        {back ? (
-          <Pressable
-            accessibilityLabel="Voltar"
-            onPress={() =>
-              router.canGoBack() ? router.back() : router.replace("/")
-            }
-            hitSlop={12}
+      <View style={[s.header, { paddingHorizontal: horizontal }]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Condovery, início"
+          onPress={() => router.navigate("/")}
+        >
+          <T
+            heading
+            style={{ fontSize: width <= 420 ? 23 : 25, letterSpacing: -1.5 }}
           >
-            <ArrowLeft color={colors.ink} />
-          </Pressable>
-        ) : (
-          <T heading style={{ fontSize: 24 }}>
             condovery<T style={{ fontSize: 27, color: colors.orange }}>.</T>
           </T>
-        )}
-        <View style={{ flex: 1 }}>
-          {title ? (
+        </Pressable>
+        <View
+          style={{
+            flex: 1,
+            minWidth: 0,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 5,
+          }}
+        >
+          {viewer ? (
+            <>
+              <MapPin size={17} color={colors.orange} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <T
+                  style={{ fontSize: 10, lineHeight: 14, color: colors.muted }}
+                >
+                  Você está em
+                </T>
+                <T
+                  bold
+                  numberOfLines={1}
+                  style={{ fontSize: 12, lineHeight: 16 }}
+                >
+                  {viewer.condominium_name}
+                </T>
+              </View>
+            </>
+          ) : (
             <T heading style={{ fontSize: 18 }}>
               {title}
             </T>
-          ) : viewer ? (
-            <>
-              <T style={{ fontSize: 10, color: colors.muted }}>Você está em</T>
-              <T bold numberOfLines={1} style={{ fontSize: 12 }}>
-                {viewer?.condominium_name}
-              </T>
-            </>
-          ) : null}
+          )}
         </View>
         {viewer && (
-          <Pressable
-            accessibilityLabel="Notificações"
-            onPress={() => router.push("/notificacoes")}
-            hitSlop={10}
-          >
-            <Bell size={22} color={colors.ink} />
-          </Pressable>
+          <View style={{ flexDirection: "row", gap: 5 }}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Notificações"
+              onPress={() => router.navigate("/notificacoes")}
+              style={s.headerAction}
+            >
+              <Bell size={20} color={colors.ink} />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Abrir carrinho"
+              onPress={() => router.navigate("/carrinho")}
+              style={s.headerAction}
+            >
+              <ShoppingBag size={22} color={colors.ink} />
+              {count > 0 && (
+                <View
+                  style={{
+                    position: "absolute",
+                    top: -3,
+                    right: -3,
+                    backgroundColor: colors.orange,
+                    borderRadius: 20,
+                    minWidth: 17,
+                    alignItems: "center",
+                    paddingHorizontal: 3,
+                  }}
+                >
+                  <T
+                    bold
+                    style={{ color: "white", fontSize: 10, lineHeight: 17 }}
+                  >
+                    {count}
+                  </T>
+                </View>
+              )}
+            </Pressable>
+          </View>
         )}
       </View>
       <ScrollView
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         refreshControl={refreshControl}
-        contentContainerStyle={{ padding: 20, paddingBottom: 180, gap: 20 }}
+        contentContainerStyle={{
+          paddingHorizontal: horizontal,
+          paddingTop: width <= 420 ? 20 : 24,
+          paddingBottom: 180 + insets.bottom,
+          gap: 20,
+        }}
       >
+        {back && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Voltar"
+            onPress={() =>
+              router.canGoBack() ? router.back() : router.replace("/")
+            }
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 7,
+              alignSelf: "flex-start",
+              minHeight: 35,
+            }}
+          >
+            <ArrowLeft size={18} color={colors.ink} />
+            <T bold style={{ fontSize: 12 }}>
+              {backLabel}
+            </T>
+          </Pressable>
+        )}
         {children}
       </ScrollView>
-      {viewer && pathname !== "/carrinho" && <FloatingCart />}
     </SafeAreaView>
-  );
-}
-function FloatingCart() {
-  const { cart } = useMarket();
-  const count = cart.items.reduce((s, i) => s + i.quantity, 0);
-  if (!count) return null;
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={() => router.push("/carrinho")}
-      style={s.cart}
-    >
-      <ShoppingBag color="white" size={21} />
-      <T bold style={{ color: "white", flex: 1 }}>
-        {count} {count === 1 ? "item" : "itens"} · Ver carrinho
-      </T>
-      <ChevronRight color="white" size={18} />
-    </Pressable>
   );
 }
 export function Picture({
   path,
   label,
   height = 160,
+  aspectRatio,
+  radius = 18,
+  fallback,
 }: {
   path?: string | null;
   label: string;
   height?: number;
+  aspectRatio?: number;
+  radius?: number;
+  fallback?: React.ReactNode;
 }) {
   const { viewer, api } = useAuth();
   const source = api.image(path, viewer?.id ?? "");
+  const shape = {
+    width: "100%" as const,
+    ...(aspectRatio ? { aspectRatio } : { height }),
+    borderRadius: radius,
+    overflow: "hidden" as const,
+    backgroundColor: "#EEE8DC",
+  };
   return source ? (
     <Image
       accessibilityLabel={label}
       source={source}
-      style={{
-        width: "100%",
-        height,
-        borderRadius: 18,
-        backgroundColor: "#EEE8DC",
-      }}
+      style={shape}
       resizeMode="cover"
     />
   ) : (
-    <View
-      style={{
-        height,
-        width: "100%",
-        borderRadius: 18,
-        backgroundColor: "#F3E9D7",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 8,
-      }}
-    >
-      <ShoppingBag color="#A68B62" size={35} />
-      <T style={{ color: "#A68B62", fontSize: 11 }}>feito por vizinhos</T>
+    <View style={shape}>
+      {fallback ?? (
+        <LinearGradient
+          colors={["#E9E4D2", "#F7EAD0"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={{
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 7,
+          }}
+        >
+          <ShoppingBasket color="#BE9162" size={35} />
+          <T heading style={{ color: "#9C8864", fontSize: 11 }}>
+            feito por vizinhos
+          </T>
+        </LinearGradient>
+      )}
     </View>
   );
 }
@@ -277,8 +414,17 @@ export function ProductCard({
 }) {
   const market = useMarket();
   const fav = market.favorites.data?.ids.includes(p.id);
+  const unavailable = p.stock === 0 || p.visibility === "unavailable";
   return (
-    <View style={[s.product, { width: width ?? "48%" }]}>
+    <View
+      style={[
+        s.product,
+        {
+          width: width ?? "100%",
+          backgroundColor: unavailable ? "#F0F0EE" : "#FFFCF8",
+        },
+      ]}
+    >
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={"Ver " + p.name}
@@ -288,96 +434,244 @@ export function ProductCard({
             params: { shop: p.shop_id, id: p.id },
           })
         }
-        style={{
-          opacity: p.stock === 0 || p.visibility === "unavailable" ? 0.55 : 1,
-        }}
+        style={{ opacity: unavailable ? 0.48 : 1, flex: 1 }}
       >
-        <Picture path={p.image_url} label={p.name} height={145} />
-        <View style={{ padding: 12, gap: 3 }}>
-          {p.promo_price_cents != null && (
-            <T bold style={{ fontSize: 10, color: colors.orange }}>
-              OFERTA
+        <Picture path={p.image_url} label={p.name} aspectRatio={1} />
+        {p.promo_price_cents != null && (
+          <View
+            style={{
+              position: "absolute",
+              top: 9,
+              left: 9,
+              backgroundColor: "#F7653C",
+              borderRadius: 999,
+              paddingVertical: 5,
+              paddingHorizontal: 10,
+            }}
+          >
+            <T bold style={{ color: "white", fontSize: 10, lineHeight: 15 }}>
+              Oferta
             </T>
-          )}
-          <T bold numberOfLines={2}>
+          </View>
+        )}
+        <View
+          style={{
+            paddingTop: 12,
+            paddingHorizontal: 11,
+            paddingBottom: 14,
+            gap: 1,
+            minHeight: 95,
+            opacity: unavailable ? 0.72 : 1,
+          }}
+        >
+          <T bold numberOfLines={2} style={{ fontSize: 14, lineHeight: 19 }}>
             {p.name}
           </T>
-          <T numberOfLines={1} style={{ fontSize: 11, color: colors.muted }}>
+          <T
+            numberOfLines={1}
+            style={{ fontSize: 11, lineHeight: 17, color: colors.muted }}
+          >
             {p.shop_name}
           </T>
-          {p.promo_price_cents != null && (
-            <T
-              style={{
-                fontSize: 11,
-                textDecorationLine: "line-through",
-                color: colors.muted,
-              }}
-            >
-              {money(p.price_cents)}
+          <View
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              alignItems: "baseline",
+              gap: 6,
+              marginTop: 5,
+            }}
+          >
+            {p.promo_price_cents != null && (
+              <T
+                style={{
+                  fontSize: 10,
+                  color: "#898B85",
+                  textDecorationLine: "line-through",
+                }}
+              >
+                {money(p.price_cents)}
+              </T>
+            )}
+            <T bold style={{ fontSize: 15 }}>
+              {money(p.promo_price_cents ?? p.price_cents)}
             </T>
-          )}
-          <T bold>{money(p.promo_price_cents ?? p.price_cents)}</T>
-          {(p.stock === 0 || p.visibility === "unavailable") && (
-            <T style={{ fontSize: 11 }}>
-              {p.stock === 0 ? "Esgotado" : "Indisponível"}
-            </T>
-          )}
+          </View>
         </View>
       </Pressable>
+      {unavailable && (
+        <View
+          style={{
+            position: "absolute",
+            top: 10,
+            left: 10,
+            backgroundColor: "#494945",
+            borderRadius: 99,
+            paddingVertical: 7,
+            paddingHorizontal: 10,
+          }}
+          pointerEvents="none"
+        >
+          <T bold style={{ fontSize: 10, color: "white", lineHeight: 15 }}>
+            {p.stock === 0 ? "Esgotado" : "Indisponível"}
+          </T>
+        </View>
+      )}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={
           fav ? "Remover dos favoritos" : "Salvar nos favoritos"
         }
-        onPress={() => market.toggleFavorite(p.id).catch((e) => alertError(e))}
+        accessibilityState={{ selected: !!fav }}
+        onPress={() => market.toggleFavorite(p.id).catch(alertError)}
         style={{
           position: "absolute",
-          right: 8,
-          top: 8,
-          borderRadius: 30,
-          padding: 9,
-          backgroundColor: "white",
+          right: 10,
+          top: 10,
+          borderRadius: 99,
+          width: 35,
+          height: 35,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "rgba(255,255,255,.95)",
+          boxShadow: "0 2px 11px rgba(43,30,10,.13)",
         }}
       >
         <Heart
           size={18}
-          fill={fav ? colors.orange : "none"}
-          color={fav ? colors.orange : colors.muted}
+          fill={fav ? "#ED6043" : "none"}
+          color={fav ? "#ED6043" : "#585650"}
         />
       </Pressable>
+    </View>
+  );
+}
+export function ProductGrid({ products }: { products: Product[] }) {
+  const dimensions = useWindowDimensions();
+  const [measured, setMeasured] = useState<{
+    viewport: number;
+    width: number;
+  } | null>(null);
+  const width =
+    measured?.viewport === dimensions.width
+      ? measured.width
+      : dimensions.width - (dimensions.width <= 420 ? 30 : 40);
+  return (
+    <View
+      onLayout={(event) =>
+        setMeasured({
+          viewport: dimensions.width,
+          width: event.nativeEvent.layout.width,
+        })
+      }
+      style={{ width: "100%", flexDirection: "row", flexWrap: "wrap", gap: 15 }}
+    >
+      {products.map((p) => (
+        <ProductCard
+          key={p.id}
+          product={p}
+          width={Math.max(0, (width - 15) / 2)}
+        />
+      ))}
+    </View>
+  );
+}
+export function ShopLogo({
+  shop,
+  size = 70,
+  coverFallback = false,
+}: {
+  shop: Shop;
+  size?: number;
+  coverFallback?: boolean;
+}) {
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        overflow: "hidden",
+        backgroundColor: "#FFEBC2",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Picture
+        path={shop.logo_image ?? (coverFallback ? shop.cover_image : null)}
+        label={shop.name}
+        height={size}
+        radius={size / 2}
+        fallback={
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: "#FFEBC2",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Store size={27} color="#AC7936" />
+          </View>
+        }
+      />
     </View>
   );
 }
 export function ShopRow({ shop }: { shop: Shop }) {
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={"Ver loja " + shop.name}
       onPress={() =>
         router.push({ pathname: "/loja/[id]", params: { id: shop.id } })
       }
-      style={[s.card, { flexDirection: "row", alignItems: "center", gap: 12 }]}
+      style={{
+        backgroundColor: colors.card,
+        borderWidth: 1,
+        borderColor: "#ECE7DB",
+        padding: 12,
+        borderRadius: 17,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 14,
+      }}
     >
-      <View style={{ width: 62 }}>
-        {shop.logo_image ? (
-          <Picture path={shop.logo_image} label={shop.name} height={62} />
-        ) : (
-          <Store color={colors.orange} size={36} />
-        )}
-      </View>
-      <View style={{ flex: 1 }}>
+      <ShopLogo shop={shop} coverFallback />
+      <View style={{ flex: 1, minWidth: 0 }}>
         <T bold>{shop.name}</T>
         <T numberOfLines={1} style={{ fontSize: 12, color: colors.muted }}>
-          {shop.description}
+          {shop.description || "Conheça os produtos dessa loja"}
         </T>
-        <T
+        <View
           style={{
-            fontSize: 11,
-            color: shop.is_open ? colors.green : colors.muted,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 4,
+            marginTop: 4,
           }}
         >
-          {shop.is_open ? "Aceitando pedidos" : "Fechada"}
-        </T>
+          <View
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: 3,
+              backgroundColor: shop.is_open ? colors.green : colors.muted,
+            }}
+          />
+          <T
+            bold
+            style={{
+              fontSize: 11,
+              lineHeight: 17,
+              color: shop.is_open ? colors.green : colors.muted,
+            }}
+          >
+            {shop.is_open ? "Aceitando pedidos" : "Fechada"}
+          </T>
+        </View>
       </View>
-      <ChevronRight color={colors.muted} size={18} />
+      <ChevronRight color="#777777" size={20} />
     </Pressable>
   );
 }
@@ -397,16 +691,36 @@ export function Section({
         alignItems: "center",
         justifyContent: "space-between",
         gap: 12,
+        marginTop: 11,
+        marginBottom: -5,
       }}
     >
-      <T heading style={{ fontSize: 22, lineHeight: 28, flex: 1 }}>
+      <T
+        heading
+        style={{
+          fontSize: 21,
+          lineHeight: 26.25,
+          letterSpacing: -0.5,
+          flex: 1,
+        }}
+      >
         {title}
       </T>
       {action && (
-        <Pressable onPress={onAction}>
-          <T bold style={{ fontSize: 12 }}>
-            {action} ›
+        <Pressable
+          accessibilityRole="button"
+          onPress={onAction}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 2,
+            paddingVertical: 6,
+          }}
+        >
+          <T bold style={{ fontSize: 12, color: "#D65C39" }}>
+            {action}
           </T>
+          <ChevronRight size={14} color="#D65C39" />
         </Pressable>
       )}
     </View>
@@ -480,28 +794,25 @@ export const s = StyleSheet.create({
   header: {
     minHeight: 70,
     paddingHorizontal: 20,
-    gap: 18,
+    gap: 10,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#FDFCF7",
     borderBottomWidth: 1,
     borderColor: colors.line,
   },
+  headerAction: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#FFF7E8",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   product: {
     backgroundColor: colors.card,
     borderRadius: 20,
     overflow: "hidden",
-  },
-  cart: {
-    position: "absolute",
-    bottom: 102,
-    left: 20,
-    right: 20,
-    borderRadius: 999,
-    padding: 15,
-    backgroundColor: colors.nav,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
+    boxShadow: "0 6px 25px rgba(36,27,13,.055)",
   },
 });

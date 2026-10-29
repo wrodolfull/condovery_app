@@ -51,6 +51,14 @@ export type HomeData = {
   shops: Shop[];
   products: Product[];
 };
+export type CommunityFair = {
+  id: string;
+  title: string;
+  description: string;
+  cover_image_url: string | null;
+  starts_at: string;
+  ends_at: string;
+};
 export type CartItem = {
   key: string;
   product: Product;
