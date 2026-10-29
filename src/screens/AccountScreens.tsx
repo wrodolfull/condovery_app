@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Alert, Pressable, Switch, View } from "react-native";
+import { Alert, Modal, Pressable, Switch, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import {
   Bell, ChevronRight, CircleHelp, Gift, LogOut, Receipt,
@@ -34,16 +34,22 @@ type AccountLink = {
 export function Account() {
   const auth = useAuth();
   const viewer = auth.viewer;
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const webPanel = () => void openWeb(auth.api.web("/?painel=vendedor")).catch(alertError);
-  const logout = () =>
-    Alert.alert(
-      "Sair da conta?",
-      "Você poderá entrar novamente a qualquer momento.",
-      [
-        { text: "Continuar aqui", style: "cancel" },
-        { text: "Sair", onPress: () => void auth.logout().catch(alertError) },
-      ],
-    );
+  const logout = () => setLogoutOpen(true);
+  const confirmLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await auth.logout();
+      setLogoutOpen(false);
+    } catch (e) {
+      alertError(e);
+    } finally {
+      setLoggingOut(false);
+    }
+  };
   const shortcuts: AccountLink[] = [
     {
       label: "Feiras do condomínio",
@@ -103,6 +109,45 @@ export function Account() {
       onPress: () => router.push("/excluir-conta"),
     });
   return (
+    <>
+      <Modal
+        visible={logoutOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { if (!loggingOut) setLogoutOpen(false); }}
+        statusBarTranslucent
+      >
+        <View style={{
+          flex: 1, backgroundColor: "rgba(29,26,22,0.57)",
+          justifyContent: "center", paddingHorizontal: 24,
+        }}>
+          <View style={{
+            backgroundColor: "#FFFCF8", borderRadius: 26,
+            padding: 25, gap: 15, alignItems: "center",
+          }}>
+            <View style={{
+              backgroundColor: "#FFF0DF", borderRadius: 22,
+              width: 70, height: 70, alignItems: "center", justifyContent: "center",
+            }}>
+              <LogOut size={29} color={colors.orange} />
+            </View>
+            <T heading style={{ fontSize: 25, textAlign: "center" }}>
+              Sair da conta?
+            </T>
+            <T style={{ textAlign: "center", color: colors.muted, lineHeight: 22 }}>
+              Você poderá entrar novamente quando quiser. Seus pedidos e suas informações continuarão salvos.
+            </T>
+            <View style={{ width: "100%", gap: 10, marginTop: 8 }}>
+              <Button title="Continuar no Condovery"
+                disabled={loggingOut}
+                onPress={() => setLogoutOpen(false)} />
+              <Button title={loggingOut ? "Saindo..." : "Sim, sair da conta"}
+                secondary disabled={loggingOut}
+                onPress={() => void confirmLogout()} />
+            </View>
+          </View>
+        </View>
+      </Modal>
     <Screen title="Minha conta">
       <View style={{ gap: 4 }}>
         <T heading style={{ fontSize: 28 }}>Meu perfil</T>
@@ -194,6 +239,7 @@ export function Account() {
         />
       </View>
     </Screen>
+    </>
   );
 }
 export function Profile() {
