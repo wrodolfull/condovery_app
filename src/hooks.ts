@@ -3,6 +3,7 @@ import { useAuth } from "./auth";
 export type Resource<T> = {
   data: T | null;
   loading: boolean;
+  updatedAt: Date | null;
   error: string;
   reload: () => Promise<T | undefined>;
 };
@@ -18,6 +19,7 @@ export function useResource<T>(path: string | null): Resource<T> {
   return {
     data: query.data ?? null,
     loading: !!path && query.isPending,
+    updatedAt: query.dataUpdatedAt ? new Date(query.dataUpdatedAt) : null,
     error: query.error?.message ?? "",
     reload: () => query.refetch({ throwOnError: true }).then((r) => r.data),
   };
