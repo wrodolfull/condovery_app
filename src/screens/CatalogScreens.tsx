@@ -5,7 +5,6 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
-  Share,
   View,
   useWindowDimensions,
 } from "react-native";
