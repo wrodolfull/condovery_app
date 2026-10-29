@@ -230,7 +230,7 @@ export function Checkout() {
                 secondary={actual !== "delivery"}
                 onPress={() => setFulfillment("delivery")}
               />
-            )}{" "}
+            )}
             {shop.pickup_enabled && (
               <Button
                 title="Retirada"
