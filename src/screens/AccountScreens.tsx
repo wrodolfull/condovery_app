@@ -471,7 +471,7 @@ export function Inbox() {
           secondary
           onPress={() => setPage((n) => n - 1)}
         />
-      )}{" "}
+      )}
       {r.data?.hasMore && (
         <Button
           title="Próximos avisos"
