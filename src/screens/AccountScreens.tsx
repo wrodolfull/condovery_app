@@ -211,12 +211,27 @@ export function Profile() {
   const set = (key: keyof typeof form, value: string) =>
     setForm((v) => ({ ...v, [key]: value }));
   const photo = async () => {
+    setError("");
+    setMessage("");
     setBusy(true);
     try {
       const url = await uploadPicture(api, "profile");
-      if (url) set("avatar_image", url);
+      if (!url) return;
+      // Save the same server-side users.avatar_image used by web and mobile
+      // immediately; do not require a second "Salvar meus dados" action.
+      if (!viewer) throw new Error("Sessão indisponível.");
+      await api.request("me", "PATCH", {
+        name: viewer.name,
+        phone: viewer.phone,
+        tower: viewer.tower,
+        apartment: viewer.apartment,
+        avatar_image: url,
+      });
+      set("avatar_image", url);
+      await refresh();
+      setMessage("Foto de perfil atualizada.");
     } catch (e) {
-      setError((e as Error).message);
+      setError(e instanceof Error ? e.message : "Não foi possível atualizar a foto.");
     } finally {
       setBusy(false);
     }
