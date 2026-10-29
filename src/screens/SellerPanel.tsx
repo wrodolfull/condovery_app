@@ -8,6 +8,7 @@ import { money, colors } from "../theme";
 import { uploadPicture } from "../upload";
 import { allowedPaymentMethods, PAYMENT_LABELS, type PaymentMethod } from "../domain/payment-methods";
 import type { Product, Category, Order } from "../types";
+import type { OptionGroup } from "../domain/orders";
 
 type Shop = {
   id:string; name:string; status:string; description:string; whatsapp:string;
@@ -60,7 +61,7 @@ export default function SellerPanel() {
   const [form,setForm]=useState<ShopForm>(defaultShop);
   const [productForm,setProductForm]=useState<{
     id:string;name:string;description:string;category_id:string;price:string;promo:string;
-    stock:string;image_url:string;visibility:Product["visibility"];lead_time:string;
+    stock:string;image_url:string;visibility:Product["visibility"];lead_time:string;option_groups:OptionGroup[];
   }|null>(null);
   const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false);
   const [error,setError]=useState(""),[success,setSuccess]=useState("");
@@ -108,12 +109,12 @@ export default function SellerPanel() {
     finally{setBusy(false);}
   }
   const newProduct=()=>setProductForm({id:"",name:"",description:"",category_id:categories[0]?.id??"",
-    price:"",promo:"",stock:"",image_url:"",visibility:"available",lead_time:""});
+    price:"",promo:"",stock:"",image_url:"",visibility:"available",lead_time:"",option_groups:[]});
   const editProduct=(p:Product)=>setProductForm({id:p.id,name:p.name,description:p.description,
     category_id:p.category_id,price:String(p.price_cents/100),
     promo:p.promo_price_cents==null?"":String(p.promo_price_cents/100),
     stock:p.stock==null?"":String(p.stock),image_url:p.image_url??"",
-    visibility:p.visibility,lead_time:p.lead_time??""});
+    visibility:p.visibility,lead_time:p.lead_time??"",option_groups:p.option_groups??[]});
   const cents=(v:string)=>Math.round(Number(v.replace(",", "."))*100);
   const uploadEditorImage = async (target:"product"|"logo_image"|"cover_image") => {
     setBusy(true);setError("");
@@ -133,7 +134,7 @@ export default function SellerPanel() {
     const data={name:p.name,description:p.description,category_id:p.category_id,
       price_cents:cents(p.price),promo_price_cents:p.promo?cents(p.promo):null,
       stock:p.stock?Number(p.stock):null,image_url:p.image_url||null,
-      visibility:p.visibility,lead_time:p.lead_time,option_groups:p.id?(products.find(x=>x.id===p.id)?.option_groups??[]):[]};
+      visibility:p.visibility,lead_time:p.lead_time,option_groups:p.option_groups};
     await api.request(p.id?"products/"+p.id:"products",p.id?"PATCH":"POST",data);
     setProductForm(null);
   });
@@ -205,6 +206,47 @@ export default function SellerPanel() {
         <Field label="Prazo de preparo" value={productForm.lead_time} onChangeText={v=>setProductForm(p=>p?{...p,lead_time:v}:p)}/>
         <Picture path={productForm.image_url} label="Foto do produto" height={170}/>
         <Button title="Selecionar foto" secondary busy={busy} onPress={()=>void uploadEditorImage("product")}/>
+        <T heading style={{fontSize:19}}>Personalização do produto</T>
+        <T style={{color:colors.muted}}>Adicione grupos como tamanho, sabores ou adicionais, com preços opcionais.</T>
+        {productForm.option_groups.map((g,gi)=><View key={g.id} style={line}>
+          <Field label={"Nome do grupo "+(gi+1)} value={g.name}
+            onChangeText={v=>setProductForm(p=>p?{...p,option_groups:p.option_groups.map(x=>x.id===g.id?{...x,name:v}:x)}:p)}/>
+          <View style={{flexDirection:"row",justifyContent:"space-between",alignItems:"center"}}>
+            <T>Escolha obrigatória</T>
+            <Switch value={g.required} onValueChange={v=>setProductForm(p=>p?{...p,option_groups:p.option_groups.map(x=>x.id===g.id?{...x,required:v}:x)}:p)}/>
+          </View>
+          <View style={{flexDirection:"row",justifyContent:"space-between",alignItems:"center"}}>
+            <T>Permitir várias escolhas</T>
+            <Switch value={g.multiple} onValueChange={v=>setProductForm(p=>p?{...p,option_groups:p.option_groups.map(x=>x.id===g.id?{...x,multiple:v}:x)}:p)}/>
+          </View>
+          {g.options.map((o,oi)=><View key={o.id} style={{gap:8}}>
+            <Field label={"Opção "+(oi+1)} value={o.name} onChangeText={v=>setProductForm(p=>p?{
+              ...p,option_groups:p.option_groups.map(x=>x.id===g.id?{...x,options:x.options.map(a=>a.id===o.id?{...a,name:v}:a)}:x)
+            }:p)}/>
+            <Field label="Adicional (centavos)" keyboardType="number-pad" value={String(o.price_cents)}
+              onChangeText={v=>setProductForm(p=>p?{
+                ...p,option_groups:p.option_groups.map(x=>x.id===g.id?{...x,
+                  options:x.options.map(a=>a.id===o.id?{...a,price_cents:Number(v.replace(/\D/g,""))||0}:a)}:x)
+              }:p)}/>
+            <Button title="Remover opção" secondary disabled={g.options.length<=1}
+              onPress={()=>setProductForm(p=>p?{...p,
+                option_groups:p.option_groups.map(x=>x.id===g.id?{...x,options:x.options.filter(a=>a.id!==o.id)}:x)
+              }:p)}/>
+          </View>)}
+          <Button title="Adicionar opção" secondary disabled={g.options.length>=15}
+            onPress={()=>setProductForm(p=>p?{...p,
+              option_groups:p.option_groups.map(x=>x.id===g.id?{...x,
+                options:[...x.options,{id:randomUUID(),name:"",price_cents:0}]}:x)
+            }:p)}/>
+          <Button title="Remover grupo" secondary onPress={()=>setProductForm(p=>p?{
+            ...p,option_groups:p.option_groups.filter(x=>x.id!==g.id)
+          }:p)}/>
+        </View>)}
+        <Button title="Adicionar grupo" secondary disabled={productForm.option_groups.length>=8}
+          onPress={()=>setProductForm(p=>p?{...p,
+            option_groups:[...p.option_groups,{id:randomUUID(),name:"",required:false,multiple:false,
+              options:[{id:randomUUID(),name:"",price_cents:0}]}]
+          }:p)}/>
         <T bold>Disponibilidade</T>
         {(["available","unavailable","hidden"] as const).map(v=><Pressable key={v}
           onPress={()=>setProductForm(p=>p?{...p,visibility:v}:p)} style={{...line,backgroundColor:productForm.visibility===v?"#FFF1C9":"white"}}>
