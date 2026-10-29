@@ -31,7 +31,7 @@ function fromShop(s:Shop):ShopForm {
   return {name:s.name,description:s.description,whatsapp:s.whatsapp,
     logo_image:s.logo_image??"",cover_image:s.cover_image??"",is_open:s.is_open,
     delivery_enabled:s.delivery_enabled,pickup_enabled:s.pickup_enabled,
-    delivery_fee_cents:String(s.delivery_fee_cents??0),lead_time:s.lead_time??"",
+    delivery_fee_cents:((s.delivery_fee_cents??0)/100).toFixed(2).replace(".",","),lead_time:s.lead_time??"",
     pickup_instructions:s.pickup_instructions??"",
     payment_methods:allowedPaymentMethods(s.payment_methods)};
 }
@@ -157,7 +157,6 @@ export default function SellerPanel() {
     </Card>:<>
       <View style={line}>
         <T bold style={{fontSize:19}}>{shop.name}</T>
-        <T style={{color:colors.muted}}>Situação: {shop.status}</T>
         <View style={{flexDirection:"row",alignItems:"center",justifyContent:"space-between"}}>
           <T bold>Loja aberta</T>
           <Switch value={shop.is_open} disabled={busy||shop.status!=="approved"}
@@ -293,7 +292,7 @@ export default function SellerPanel() {
             <T bold>{key==="delivery_enabled"?"Aceita entregas":"Aceita retirada"}</T>
             <Switch value={form[key]} onValueChange={v=>updateForm(key,v)}/>
           </View>)}
-        <Field label="Taxa de entrega em centavos" keyboardType="number-pad" value={form.delivery_fee_cents} onChangeText={v=>updateForm("delivery_fee_cents",v)}/>
+        <Field label="Taxa de entrega (R$)" keyboardType="decimal-pad" value={form.delivery_fee_cents} onChangeText={v=>updateForm("delivery_fee_cents",v)}/>
         <Field label="Prazo" value={form.lead_time} onChangeText={v=>updateForm("lead_time",v)}/>
         <Field label="Instruções para retirada" value={form.pickup_instructions} onChangeText={v=>updateForm("pickup_instructions",v)} multiline/>
         <T bold>Formas de pagamento</T>
@@ -321,7 +320,7 @@ export default function SellerPanel() {
         <Button title="Salvar configurações" busy={busy} onPress={()=>void run(async()=>{
           await api.request("shops/mine","PATCH",{
             ...form,logo_image:form.logo_image||null,cover_image:form.cover_image||null,
-            delivery_fee_cents:Number(form.delivery_fee_cents),
+            delivery_fee_cents:cents(form.delivery_fee_cents),
           });
         })}/>
         <T heading style={{fontSize:21}}>Excluir minha loja</T>
