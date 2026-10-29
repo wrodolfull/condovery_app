@@ -760,7 +760,7 @@ export function ShopDetail() {
       {resource.loading && <Loading />}
       {shop && (
         <>
-          <View>
+          <View style={{opacity:shop.is_open?1:0.48}}>
             <Picture
               path={shop.cover_image}
               label={"Capa " + shop.name}
