@@ -34,7 +34,7 @@ type AccountLink = {
 export function Account() {
   const auth = useAuth();
   const viewer = auth.viewer;
-  const webPanel = () => void openWeb(auth.api.web("/")).catch(alertError);
+  const webPanel = () => void openWeb(auth.api.web("/?painel=vendedor")).catch(alertError);
   const logout = () =>
     Alert.alert(
       "Sair da conta?",
@@ -87,7 +87,7 @@ export function Account() {
       label: "Administração",
       description: "Acesse o painel administrativo na web",
       icon: <ShieldCheck size={22} color={colors.ink} />,
-      onPress: webPanel,
+      onPress: () => void openWeb(auth.api.web("/")).catch(alertError),
     });
   shortcuts.push({
     label: "Sair",
