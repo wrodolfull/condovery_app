@@ -13,6 +13,7 @@ import type { OptionGroup } from "../domain/orders";
 import { sellerItemDetails, sellerOrderDetails } from "../domain/seller-orders";
 import { formatBRLInput, parseBRLInput } from "../domain/money-input";
 import {sellerDraftScope,parseSellerDraft,type ShopDraft} from "../domain/shop-draft";
+import {isCommercialProductCategory} from "../domain/category-purpose";
 import {loadSellerDraft,saveSellerDraft} from "../storage";
 import { mergeLatestOrders, orderHistoryPath, type OrdersPage } from "../domain/order-pagination";
 
@@ -221,13 +222,14 @@ export default function SellerPanel() {
       setReviews(response.reviews);
     });
   };
-  const newProduct=()=>{setOptionPriceDrafts({});setProductForm({id:"",name:"",description:"",category_id:categories[0]?.id??"",
+  const commercialProductCategories=categories.filter(category=>isCommercialProductCategory(category.name));
+  const newProduct=()=>{setOptionPriceDrafts({});setProductForm({id:"",name:"",description:"",category_id:commercialProductCategories[0]?.id??"",
     price:"",promo:"",stock:"",image_url:"",visibility:"available",lead_time:"",option_groups:[]});};
   const editProduct=(p:Product)=>{
     setOptionPriceDrafts(Object.fromEntries((p.option_groups??[]).flatMap(group=>
       group.options.map(option=>[option.id,formatBRLInput(option.price_cents)]))));
     setProductForm({id:p.id,name:p.name,description:p.description,
-    category_id:p.category_id,price:formatBRLInput(p.price_cents),
+    category_id:commercialProductCategories.some(category=>category.id===p.category_id)?p.category_id:"",price:formatBRLInput(p.price_cents),
     promo:p.promo_price_cents==null?"":formatBRLInput(p.promo_price_cents),
     stock:p.stock==null?"":String(p.stock),image_url:p.image_url??"",
     visibility:p.visibility,lead_time:p.lead_time??"",option_groups:p.option_groups??[]});};
@@ -360,9 +362,10 @@ export default function SellerPanel() {
         <Field label="Descrição" value={productForm.description} onChangeText={v=>setProductForm(p=>p?{...p,description:v}:p)} multiline/>
         <T bold>Categoria</T>
         <View style={{flexDirection:"row",flexWrap:"wrap",gap:7}}>
-          {categories.map(c=><Pressable key={c.id} style={{padding:10,borderRadius:12,backgroundColor:c.id===productForm.category_id?colors.yellow:"white"}}
+          {commercialProductCategories.map(c=><Pressable key={c.id} style={{padding:10,borderRadius:12,backgroundColor:c.id===productForm.category_id?colors.yellow:"white"}}
             onPress={()=>setProductForm(p=>p?{...p,category_id:c.id}:p)}><T>{c.name}</T></Pressable>)}
         </View>
+        <T style={{color:colors.muted,fontSize:12}}>Desapego é exclusivo para anúncios gratuitos entre moradores. Use a área Desapego, não o catálogo da loja.</T>
         <Field label="Preço (R$)" keyboardType="decimal-pad" value={productForm.price} onChangeText={v=>setProductForm(p=>p?{...p,price:v}:p)}/>
         <Field label="Preço promocional (R$)" keyboardType="decimal-pad" value={productForm.promo} onChangeText={v=>setProductForm(p=>p?{...p,promo:v}:p)}/>
         <Field label="Estoque (vazio = ilimitado)" keyboardType="number-pad" value={productForm.stock} onChangeText={v=>setProductForm(p=>p?{...p,stock:v}:p)}/>
