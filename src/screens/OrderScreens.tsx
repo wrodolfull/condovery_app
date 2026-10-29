@@ -32,7 +32,8 @@ import {
 } from "../domain/payment-methods";
 import { openWhatsApp } from "../external";
 import { statusLabels, type Order, type Quote } from "../types";
-import { useFocusedOrderRefresh,orderNeedsLiveRefresh } from "../useFocusedOrderRefresh";
+import { useFocusedOrderRefresh } from "../useFocusedOrderRefresh";
+import { orderNeedsLiveRefresh } from "../domain/order-refresh";
 import { orderHistoryPath, type OrdersPage } from "../domain/order-pagination";
 export function Checkout() {
   const { viewer, api } = useAuth();
