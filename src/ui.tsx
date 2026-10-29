@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -370,8 +370,8 @@ export function Picture({
 }) {
   const { viewer, api } = useAuth();
   const source = api.image(path, viewer?.id ?? "");
-  const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [source?.uri]);
+  const [failedUri, setFailedUri] = useState<string | null>(null);
+  const failed = !!source && failedUri === source.uri;
   const shape = {
     width: "100%" as const,
     ...(aspectRatio ? { aspectRatio } : { height }),
@@ -381,7 +381,7 @@ export function Picture({
   };
   return source && !failed ? (
     <Image
-      onError={() => setFailed(true)}
+      onError={() => setFailedUri(source.uri)}
       accessibilityLabel={label}
       source={source}
       style={shape}
