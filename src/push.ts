@@ -28,7 +28,7 @@ export function usePush(listen = true) {
       if (Platform.OS === "android")
         for (const [id, name] of [
           ["pedidos", "Pedidos"],
-          ["avisos", "Condomínio e lojas"],
+          ["avisos", "Avisos do condomínio"],
         ])
           await Notifications.setNotificationChannelAsync(id, {
             name,

@@ -481,10 +481,6 @@ export function Preferences() {
             />
           </Card>
         ))}
-      <T style={{ fontSize: 12, color: colors.muted }}>
-        Os avisos de cada loja são ativados ou desativados na página da própria
-        loja. A gestão da loja continua pelo navegador.
-      </T>
     </Screen>
   );
 }
@@ -523,7 +519,7 @@ export function Inbox() {
       {!r.loading && !items.length && !r.error && (
         <Empty
           title="Tudo em dia por aqui"
-          body="Os avisos do condomínio, das lojas e dos pedidos aparecerão aqui."
+          body="Os avisos do condomínio e as atualizações de pedidos aparecerão aqui."
         />
       )}
       {page > 0 && (
