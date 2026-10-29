@@ -56,7 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if(expirationBelongsToCurrentLogin(token,activeToken.current))void clear();
     });
     return () => api.setExpirationHandler(() => {});
-  }, [api, clear]);
+  }, [api, clear, token]);
   const accept = async (t: string) => {
     if (!/^[a-f0-9]{64}$/.test(t))
       throw new Error("Resposta de sessão inválida.");
