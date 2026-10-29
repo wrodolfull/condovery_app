@@ -1,5 +1,5 @@
 import { quoteChanged } from "../domain/quote";
-import { dateForApi } from "../domain/date";
+import { dateForApi, formatPreferredDate } from "../domain/date";
 import React, { useState } from "react";
 import { FlatList, Pressable, View, useWindowDimensions } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
@@ -248,8 +248,8 @@ export function Checkout() {
             label="Data preferida (opcional)"
             placeholder="dd/mm/aaaa"
             value={day}
-            onChangeText={setDay}
-            keyboardType="numbers-and-punctuation"
+            onChangeText={(value) => setDay(formatPreferredDate(value))}
+            keyboardType="number-pad"
             maxLength={10}
           />
           <Field
@@ -276,9 +276,16 @@ export function Checkout() {
                   }
                   style={{ paddingVertical: 8 }}
                 >
-                  <T>
-                    {instructions.includes(item) ? "☑" : "☐"} {item}
-                  </T>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                    <View
+                      style={{
+                        width: 21, height: 21, borderRadius: 5,
+                        borderWidth: 1.5, borderColor: instructions.includes(item) ? colors.orange : colors.muted,
+                        backgroundColor: instructions.includes(item) ? colors.orange : "transparent",
+                      }}
+                    />
+                    <T>{item}</T>
+                  </View>
                 </Pressable>
               ))}
             </Card>
@@ -297,12 +304,26 @@ export function Checkout() {
             O pagamento será combinado diretamente com a loja.
           </T>
           {accepted.map((m) => (
-            <Button
+            <Pressable
               key={m}
-              title={(chosen === m ? "● " : "○ ") + PAYMENT_LABELS[m]}
-              secondary={chosen !== m}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: chosen === m }}
+              accessibilityLabel={PAYMENT_LABELS[m]}
               onPress={() => setPayment(m)}
-            />
+              style={{
+                flexDirection: "row", alignItems: "center", gap: 12,
+                borderWidth: 1, borderColor: chosen === m ? colors.orange : colors.line,
+                borderRadius: 14, padding: 16,
+                backgroundColor: chosen === m ? "#FFF2DA" : colors.card,
+              }}
+            >
+              <View style={{
+                width: 21, height: 21, borderRadius: 5, borderWidth: 1.5,
+                borderColor: chosen === m ? colors.orange : colors.muted,
+                backgroundColor: chosen === m ? colors.orange : "transparent",
+              }} />
+              <T bold>{PAYMENT_LABELS[m]}</T>
+            </Pressable>
           ))}
         </>
       )}
