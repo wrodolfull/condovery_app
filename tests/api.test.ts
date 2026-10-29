@@ -53,10 +53,12 @@ test("native requests use bearer, omit browser cookies and do not retry mutation
 test("private media headers cannot be sent to external URLs", () => {
   const api = new ApiClient("https://condovery.example", "a".repeat(64));
   assert.equal(api.image("https://external.example/picture", "account"), null);
-  assert.ok(
-    api.image("/api/media/771e965c-5e32-40aa-b2f1-11cc208260f8", "account")
-      ?.headers.Authorization,
+  const media = api.image(
+    "/api/media/771e965c-5e32-40aa-b2f1-11cc208260f8",
+    "account",
   );
+  assert.ok(media?.headers.Authorization);
+  assert.equal(media?.cache, "force-cache");
 });
 test("expired sessions notify the session owner; a wrong deletion password does not log out", async () => {
   const original = globalThis.fetch;
@@ -89,4 +91,28 @@ test("preferred delivery dates are valid calendar dates without timezone convers
   assert.equal(dateForApi("29/02/2028"), "2028-02-29");
   assert.throws(() => dateForApi("29/02/2027"));
   assert.throws(() => dateForApi("31/04/2027"));
+});
+
+test("registration and condominium lookup remain public while authenticated requests use bearer", async () => {
+  const original = globalThis.fetch;
+  const requests: RequestInit[] = [];
+  globalThis.fetch = async (_input, init) => {
+    requests.push(init!);
+    return Response.json({ ok: true });
+  };
+  try {
+    const api = new ApiClient("https://condovery.example", "a".repeat(64));
+    await api.request("public/condominium", "POST", { invite: "my-invite" }, true);
+    await api.request("auth/register", "POST", { email: "test@example.com" }, true);
+    await api.request("catalog?page=1&limit=24");
+    assert.equal(requests.length, 3);
+    assert.equal((requests[0].headers as Record<string, string>).Authorization, undefined);
+    assert.equal((requests[1].headers as Record<string, string>).Authorization, undefined);
+    assert.equal(
+      (requests[2].headers as Record<string, string>).Authorization,
+      "Bearer " + "a".repeat(64),
+    );
+  } finally {
+    globalThis.fetch = original;
+  }
 });

@@ -118,7 +118,7 @@ const campaigns = [0, 1].map((i) => ({
 }));
 const navLabels = ["Início", "Explorar", "Salvos", "Pedidos", "Conta"];
 
-async function enter(page: Page, withAds = true) {
+async function enter(page: Page, withAds = true, withFairs = true, extendedCatalog = false) {
   const errors: string[] = [],
     impressions: string[] = [];
   let favoriteIds: string[] = [];
@@ -184,17 +184,28 @@ async function enter(page: Page, withAds = true) {
     else if (/^ads\/[^/]+\/impression$/.test(endpoint)) {
       impressions.push(endpoint);
       value = { ok: true };
-    } else if (endpoint === "fairs") value = { fairs: [fair] };
+    } else if (endpoint === "fairs") value = { fairs: withFairs ? [fair] : [] };
     else if (endpoint === "fairs/" + fair.id) value = { fair, products };
-    else if (endpoint === "catalog")
+    else if (endpoint === "catalog") {
+      const pageIndex = Number(url.searchParams.get("page") ?? "0");
+      const limit = Number(url.searchParams.get("limit") ?? "24");
+      const all = extendedCatalog
+        ? Array.from({ length: 26 }, (_, i) => ({
+            ...products[0],
+            id: String(i + 1).padStart(8, "0") + "-2222-4333-8444-555555555555",
+            name: "Bolo da vizinhança " + (i + 1),
+          }))
+        : products;
+      const matched = all.filter((p) =>
+        p.name
+          .toLowerCase()
+          .includes((url.searchParams.get("search") ?? "").toLowerCase()),
+      );
       value = {
-        products: products.filter((p) =>
-          p.name
-            .toLowerCase()
-            .includes((url.searchParams.get("search") ?? "").toLowerCase()),
-        ),
-        hasMore: false,
+        products: matched.slice(pageIndex * limit, (pageIndex + 1) * limit),
+        hasMore: matched.length > (pageIndex + 1) * limit,
       };
+    }
     else if (endpoint === "shops/" + shop.id) value = { shop, products };
     else if (endpoint.endsWith("/reviews"))
       value = {
@@ -313,6 +324,12 @@ for (const width of [360, 390, 430]) {
     await checkNav(page, "Pedidos");
     await page.getByRole("tab", { name: "Conta", exact: true }).click();
     await checkNav(page, "Conta");
+    await expect(page.getByText("Meu perfil", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Feiras do condomínio" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Minha loja / Quero vender" })).toBeVisible();
+    await page.getByRole("button", { name: "Editar meu perfil e minha foto" }).click();
+    await expect(page.getByRole("button", { name: "Salvar meus dados" })).toBeVisible();
+    await checkNav(page);
     expect(errors).toEqual([]);
   });
 }
@@ -402,4 +419,82 @@ test("the weekly offer artwork is the fallback when there are no ads", async ({
     .click();
   await checkNav(page, "Explorar");
   expect(errors).toEqual([]);
+});
+
+test("absence of fairs and advertisements shows useful native fallbacks", async ({
+  page,
+}) => {
+  const { errors } = await enter(page, false, false);
+  await expect(page.getByText("Nenhuma feira acontecendo agora")).toBeVisible();
+  await expect(page.getByText("Ofertas da semana", { exact: true })).toBeVisible();
+  await expect(page.getByText("PUBLICIDADE", { exact: true })).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("catalog requests subsequent pages without mounting every item", async ({
+  page,
+}) => {
+  const requestedPages: string[] = [];
+  page.on("request", (req) => {
+    if (req.url().includes("/api/catalog?"))
+      requestedPages.push(new URL(req.url()).searchParams.get("page") ?? "");
+  });
+  await enter(page, true, true, true);
+  await page.getByRole("tab", { name: "Explorar" }).click();
+  await expect(page.getByRole("button", { name: "Mostrar mais produtos" })).toBeVisible();
+  await page.getByRole("button", { name: "Mostrar mais produtos" }).click();
+  await expect.poll(() => requestedPages.includes("1")).toBe(true);
+  await expect(page.getByRole("button", { name: "Mostrar mais produtos" })).toHaveCount(0);
+  await checkNav(page, "Explorar");
+});
+
+test("sign-up checks condominium invitation before enabling account creation", async ({
+  page,
+}) => {
+  const calls: string[] = [];
+  await page.route("https://condovery.example/api/**", async (route) => {
+    const endpoint = new URL(route.request().url()).pathname.slice(5);
+    const headers = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "*",
+      "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+    };
+    if (route.request().method() === "OPTIONS") {
+      await route.fulfill({ status: 204, headers });
+      return;
+    }
+    calls.push(endpoint);
+    if (endpoint === "mobile/config")
+      await route.fulfill({ json: { google: false }, headers });
+    else if (endpoint === "public/condominium")
+      await route.fulfill({
+        json: { name: "Condomínio Teste", towers: ["Torre A", "Torre B"] },
+        headers,
+      });
+    else if (endpoint === "auth/register")
+      await route.fulfill({
+        json: { message: "Conta criada! Confirme seu e-mail." },
+        status: 201,
+        headers,
+      });
+    else throw Error("Unexpected request: " + endpoint);
+  });
+  await page.goto(origin);
+  await page.getByRole("button", { name: "Cadastrar conta" }).click();
+  const create = page.getByRole("button", { name: "Criar minha conta" });
+  await expect(create).toBeDisabled();
+  await page.getByLabel("Código do condomínio").fill("TESTE-CONDOMINIO-123");
+  await page.getByRole("button", { name: "Verificar condomínio" }).click();
+  await expect(page.getByText("Condomínio Teste")).toBeVisible();
+  await page.getByLabel("Nome", { exact: true }).fill("Morador Teste");
+  await page.getByLabel("E-mail", { exact: true }).fill("teste@example.com");
+  await page.getByLabel("WhatsApp com DDD").fill("11999991234");
+  await page.getByRole("radio", { name: "Torre A" }).click();
+  await page.getByLabel("Apartamento").fill("101");
+  await page.getByLabel("Senha", { exact: true }).fill("SenhaForte123!");
+  await expect(create).toBeEnabled();
+  await create.click();
+  await expect(page.getByText("Conta criada! Confirme seu e-mail.")).toBeVisible();
+  expect(calls).toContain("public/condominium");
+  expect(calls).toContain("auth/register");
 });
