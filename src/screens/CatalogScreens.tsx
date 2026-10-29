@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
+  FlatList,
   Image,
   Pressable,
   RefreshControl,
@@ -555,11 +556,12 @@ function useCatalog(query: string, category: string, enabled = true) {
     next: () => setPagination({ filter, page: page + 1 }),
   };
 }
+type ExploreRow =
+  | { kind: "products"; key: string; products: Product[] }
+  | { kind: "shop"; key: string; shop: Shop }
+  | { kind: "more" | "empty" | "loading" | "shops-title"; key: string };
 export function Explore() {
-  const params = useLocalSearchParams<{
-    categoria?: string;
-    ofertas?: string;
-  }>();
+  const params = useLocalSearchParams<{ categoria?: string; ofertas?: string }>();
   const { home } = useMarket();
   const [query, setQuery] = useState("");
   const category = params.categoria ?? "";
@@ -568,43 +570,88 @@ export function Explore() {
   const products = catalog.products.filter(
     (p) => !params.ofertas || p.promo_price_cents != null,
   );
+  const { width } = useWindowDimensions();
+  const horizontal = width <= 420 ? 15 : 20;
+  const productWidth = Math.max(0, (width - horizontal * 2 - 15) / 2);
   const setCategory = (id: string) =>
     router.setParams({ categoria: id, ofertas: "" });
+  // One vertical virtualized list for products AND shops, avoiding nested lists
+  // and unbounded mounting as additional catalog pages are appended.
+  const rows: ExploreRow[] = [];
+  for (let i = 0; i < products.length; i += 2)
+    rows.push({
+      kind: "products",
+      key: "products-" + products[i].id,
+      products: products.slice(i, i + 2),
+    });
+  if (loading) rows.push({ kind: "loading", key: "loading" });
+  else if (!products.length) rows.push({ kind: "empty", key: "empty" });
+  if (hasMore) rows.push({ kind: "more", key: "more" });
+  rows.push({ kind: "shops-title", key: "shops-title" });
+  for (const shop of home.data?.shops ?? [])
+    rows.push({ kind: "shop", key: "shop-" + shop.id, shop });
   return (
-    <Screen title="Explorar">
-      <T heading style={{ fontSize: 28 }}>
-        Explorar
-      </T>
-      <SearchBox value={query} onChangeText={setQuery} />
-      <Categories
-        categories={home.data?.categories ?? []}
-        selected={category}
-        onSelect={setCategory}
+    <Screen title="Explorar" scrollable={false}>
+      <FlatList
+        accessibilityLabel="Catálogo e lojas"
+        data={rows}
+        keyExtractor={(item) => item.key}
+        keyboardShouldPersistTaps="handled"
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        windowSize={5}
+        contentContainerStyle={{
+          paddingHorizontal: horizontal,
+          paddingTop: width <= 420 ? 20 : 24,
+          paddingBottom: 180,
+          gap: 15,
+        }}
+        ListHeaderComponent={
+          <View style={{ gap: 20 }}>
+            <T heading style={{ fontSize: 28 }}>Explorar</T>
+            <SearchBox value={query} onChangeText={setQuery} />
+            <Categories
+              categories={home.data?.categories ?? []}
+              selected={category}
+              onSelect={setCategory}
+            />
+            <ErrorBox message={error} retry={() => void catalog.next()} />
+          </View>
+        }
+        renderItem={({ item }) => {
+          if (item.kind === "products")
+            return (
+              <View style={{ flexDirection: "row", gap: 15 }}>
+                {item.products.map((product) => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    width={productWidth}
+                  />
+                ))}
+              </View>
+            );
+          if (item.kind === "shop") return <ShopRow shop={item.shop} />;
+          if (item.kind === "shops-title")
+            return <Section title="Todas as lojas" />;
+          if (item.kind === "loading") return <Loading />;
+          if (item.kind === "empty")
+            return (
+              <Empty
+                title="Nenhum produto encontrado"
+                body="Tente outra categoria ou volte mais tarde."
+              />
+            );
+          return (
+            <Button
+              title="Mostrar mais produtos"
+              busy={loading}
+              secondary
+              onPress={catalog.next}
+            />
+          );
+        }}
       />
-      <ErrorBox message={error} />
-      <ProductGrid products={products} />
-      {loading ? (
-        <Loading />
-      ) : (
-        !products.length && (
-          <Empty
-            title="Nenhum produto encontrado"
-            body="Tente outra categoria ou volte mais tarde."
-          />
-        )
-      )}
-      {hasMore && (
-        <Button
-          title="Mostrar mais produtos"
-          busy={loading}
-          secondary
-          onPress={catalog.next}
-        />
-      )}
-      <Section title="Todas as lojas" />
-      {home.data?.shops.map((shop) => (
-        <ShopRow shop={shop} key={shop.id} />
-      ))}
     </Screen>
   );
 }

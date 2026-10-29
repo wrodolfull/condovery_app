@@ -105,7 +105,8 @@ export class ApiClient {
     return {
       uri: this.origin + path + "?account=" + encodeURIComponent(scope),
       headers: { Authorization: "Bearer " + this.token },
-      cache: "reload" as const,
+      // Media IDs are immutable and scoped to the authenticated account.
+      cache: "force-cache" as const,
     };
   }
   web(path: string) {

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -208,8 +208,10 @@ export function Screen({
   back = false,
   backLabel = "Voltar",
   refreshControl,
+  scrollable = true,
 }: {
   children: React.ReactNode;
+  scrollable?: boolean;
   title?: string;
   back?: boolean;
   backLabel?: string;
@@ -314,7 +316,7 @@ export function Screen({
           </View>
         )}
       </View>
-      <ScrollView
+      {scrollable ? <ScrollView
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         refreshControl={refreshControl}
@@ -347,7 +349,7 @@ export function Screen({
           </Pressable>
         )}
         {children}
-      </ScrollView>
+      </ScrollView> : <View style={{ flex: 1 }}>{children}</View>}
     </SafeAreaView>
   );
 }
@@ -368,6 +370,8 @@ export function Picture({
 }) {
   const { viewer, api } = useAuth();
   const source = api.image(path, viewer?.id ?? "");
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [source?.uri]);
   const shape = {
     width: "100%" as const,
     ...(aspectRatio ? { aspectRatio } : { height }),
@@ -375,8 +379,9 @@ export function Picture({
     overflow: "hidden" as const,
     backgroundColor: "#EEE8DC",
   };
-  return source ? (
+  return source && !failed ? (
     <Image
+      onError={() => setFailed(true)}
       accessibilityLabel={label}
       source={source}
       style={shape}
