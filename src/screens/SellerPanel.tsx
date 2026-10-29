@@ -112,6 +112,16 @@ export default function SellerPanel() {
     stock:p.stock==null?"":String(p.stock),image_url:p.image_url??"",
     visibility:p.visibility,lead_time:p.lead_time??""});
   const cents=(v:string)=>Math.round(Number(v.replace(",", "."))*100);
+  const uploadEditorImage = async (target:"product"|"logo_image"|"cover_image") => {
+    setBusy(true);setError("");
+    try {
+      const url=await uploadPicture(api,target==="product"?"product":"shop");
+      if(!url)return;
+      if(target==="product")setProductForm(p=>p?{...p,image_url:url}:p);
+      else updateForm(target,url);
+    }catch(e){setError((e as Error).message);}
+    finally{setBusy(false);}
+  };
   const saveProduct=()=>run(async()=>{
     if(!productForm) return;
     const p=productForm;
@@ -120,7 +130,7 @@ export default function SellerPanel() {
     const data={name:p.name,description:p.description,category_id:p.category_id,
       price_cents:cents(p.price),promo_price_cents:p.promo?cents(p.promo):null,
       stock:p.stock?Number(p.stock):null,image_url:p.image_url||null,
-      visibility:p.visibility,lead_time:p.lead_time,option_groups:[]};
+      visibility:p.visibility,lead_time:p.lead_time,option_groups:p.id?(products.find(x=>x.id===p.id)?.option_groups??[]):[]};
     await api.request(p.id?"products/"+p.id:"products",p.id?"PATCH":"POST",data);
     setProductForm(null);
   });
@@ -191,9 +201,7 @@ export default function SellerPanel() {
         <Field label="Estoque (vazio = ilimitado)" keyboardType="number-pad" value={productForm.stock} onChangeText={v=>setProductForm(p=>p?{...p,stock:v}:p)}/>
         <Field label="Prazo de preparo" value={productForm.lead_time} onChangeText={v=>setProductForm(p=>p?{...p,lead_time:v}:p)}/>
         <Picture path={productForm.image_url} label="Foto do produto" height={170}/>
-        <Button title="Selecionar foto" secondary busy={busy} onPress={()=>void run(async()=>{
-          const url=await uploadPicture(api,"product");if(url)setProductForm(p=>p?{...p,image_url:url}:p);
-        })}/>
+        <Button title="Selecionar foto" secondary busy={busy} onPress={()=>void uploadEditorImage("product")}/>
         <T bold>Disponibilidade</T>
         {(["available","unavailable","hidden"] as const).map(v=><Pressable key={v}
           onPress={()=>setProductForm(p=>p?{...p,visibility:v}:p)} style={{...line,backgroundColor:productForm.visibility===v?"#FFF1C9":"white"}}>
@@ -232,13 +240,9 @@ export default function SellerPanel() {
         <Field label="Descrição" value={form.description} onChangeText={v=>updateForm("description",v)} multiline/>
         <Field label="WhatsApp" value={form.whatsapp} onChangeText={v=>updateForm("whatsapp",v)} keyboardType="phone-pad"/>
         <T bold>Logotipo</T><Picture path={form.logo_image} label="Logo da loja" height={130}/>
-        <Button title="Trocar logo" secondary busy={busy} onPress={()=>void run(async()=>{
-          const url=await uploadPicture(api,"shop");if(url)updateForm("logo_image",url);
-        })}/>
+        <Button title="Trocar logo" secondary busy={busy} onPress={()=>void uploadEditorImage("logo_image")}/>
         <T bold>Capa</T><Picture path={form.cover_image} label="Capa da loja" height={160}/>
-        <Button title="Trocar capa" secondary busy={busy} onPress={()=>void run(async()=>{
-          const url=await uploadPicture(api,"shop");if(url)updateForm("cover_image",url);
-        })}/>
+        <Button title="Trocar capa" secondary busy={busy} onPress={()=>void uploadEditorImage("cover_image")}/>
         {(["delivery_enabled","pickup_enabled"] as const).map(key=>
           <View key={key} style={{flexDirection:"row",justifyContent:"space-between",alignItems:"center"}}>
             <T bold>{key==="delivery_enabled"?"Aceita entregas":"Aceita retirada"}</T>
