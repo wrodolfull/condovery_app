@@ -79,7 +79,6 @@ export default function SellerPanel() {
   const [applications,setApplications]=useState<FairApplication[]>([]);
   const [fairProducts,setFairProducts]=useState<{id:string;name:string}[]>([]);
   const [period,setPeriod]=useState<7|30|90>(30);
-  const [noticeTitle,setNoticeTitle]=useState(""),[noticeBody,setNoticeBody]=useState("");
   const [deletion,setDeletion]=useState("");
   const [form,setForm]=useState<ShopForm>(defaultShop);
   const formRef=useRef<ShopForm>(defaultShop);
@@ -468,21 +467,6 @@ export default function SellerPanel() {
           <View style={{width:19,height:19,borderRadius:4,backgroundColor:form.payment_methods.includes(m)?colors.orange:"transparent",borderWidth:1,borderColor:colors.orange}}/>
           <T>{PAYMENT_LABELS[m]}</T>
         </Pressable>)}
-        <T heading style={{fontSize:21}}>Avisos da loja</T>
-        <T style={{color:colors.muted}}>Envie um comunicado aos moradores que acompanham sua loja e habilitaram notificações.</T>
-        <Field label="Título do aviso" maxLength={70} value={noticeTitle} onChangeText={setNoticeTitle}/>
-        <Field label="Mensagem" maxLength={240} multiline value={noticeBody} onChangeText={setNoticeBody}/>
-        <Button title="Publicar aviso" secondary busy={busy}
-          onPress={()=>Alert.alert("Publicar aviso?","Os moradores elegíveis receberão uma notificação.",[
-            {text:"Voltar",style:"cancel"},
-            {text:"Publicar",onPress:()=>void run(async()=>{
-              const result=await api.request<{recipients:number}>("shops/mine/push","POST",{
-                title:noticeTitle.trim(),body:noticeBody.trim(),client_key:randomUUID(),
-              });
-              setNoticeTitle("");setNoticeBody("");
-              setSuccess("Aviso publicado para "+result.recipients+" moradores.");
-            })},
-          ])}/>
         <Button title="Salvar configurações" busy={busy} onPress={()=>void run(async()=>{
           const fee=parseBRLInput(form.delivery_fee_cents,1_000_000);
           if(fee===null)throw new Error("Informe uma taxa de entrega válida em reais.");
