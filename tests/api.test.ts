@@ -177,3 +177,34 @@ test("preferred date mask formats digits, supports backspace and preserves API v
   assert.equal(dateForApi(formatPreferredDate("02112026")), "2026-11-02");
   assert.throws(() => dateForApi(formatPreferredDate("31022026")), /Data inválida/);
 });
+
+test("native media upload passes bearer and lets the browser generate multipart boundary", async () => {
+  const original = globalThis.XMLHttpRequest;
+  class MockXHR {
+    headers: Record<string, string> = {};
+    status = 201;
+    responseText = JSON.stringify({ url: "/api/media/771e965c-5e32-40aa-b2f1-11cc208260f8" });
+    timeout = 0;
+    onload: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    ontimeout: (() => void) | null = null;
+    open(method: string, url: string) {
+      assert.equal(method, "POST");
+      assert.equal(url, "https://condovery.example/api/media/profile");
+    }
+    setRequestHeader(name: string, value: string) { this.headers[name] = value; }
+    send(body: unknown) {
+      assert.ok(body instanceof FormData);
+      assert.equal(this.headers.Authorization, "Bearer " + "a".repeat(64));
+      assert.equal(this.headers["Content-Type"], undefined);
+      this.onload?.();
+    }
+  }
+  globalThis.XMLHttpRequest = MockXHR as unknown as typeof XMLHttpRequest;
+  try {
+    const api = new ApiClient("https://condovery.example", "a".repeat(64));
+    const form = new FormData();
+    const r = await api.upload<{ url: string }>("media/profile", form);
+    assert.equal(r.url, "/api/media/771e965c-5e32-40aa-b2f1-11cc208260f8");
+  } finally { globalThis.XMLHttpRequest = original; }
+});
