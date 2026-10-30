@@ -1,6 +1,6 @@
-# Condovery App
+# Elevadoor App
 
-Aplicativo **Android e iOS** com Expo SDK 57, React Native, Expo Router e TypeScript. A interface do morador foi portada do [Condovery web](https://github.com/wrodolfull/condovery), preservando sua identidade visual e consumindo o mesmo backend.
+Aplicativo **Android e iOS** com Expo SDK 57, React Native, Expo Router e TypeScript. A interface do morador foi portada do [Elevadoor web](https://github.com/wrodolfull/condovery), preservando sua identidade visual e consumindo o mesmo backend.
 
 ## O que está implementado
 
@@ -35,7 +35,7 @@ Requer Node.js 22.13+ ou uma versão LTS compatível com o SDK.
 npm ci
 ```
 
-Copie `.env.example` para `.env`. Configure `EXPO_PUBLIC_API_URL` com o endereço HTTPS **do backend Condovery**, sem `/api` no final. O endereço precisa ser acessível ao telefone; `localhost` no aparelho não aponta para o computador.
+Copie `.env.example` para `.env`. Configure `EXPO_PUBLIC_API_URL` com o endereço HTTPS **do backend Elevadoor**, sem `/api` no final. O endereço precisa ser acessível ao telefone; `localhost` no aparelho não aponta para o computador.
 
 ```bash
 npm start
@@ -111,3 +111,11 @@ A CI verifica tipos, lint, testes, versões do SDK e exportação das três plat
 Origem inicial: commit web `d68f0feaf94cb5a0dcbd29cbc05dede4315ee13f`. A revisão da vitrine usa `c4241386d7a36966b2f2659104f86ee431bb9aea` como referência para navegação, hero, categorias, publicidade, feiras, produtos e lojas. Coral `#FC6741`, amarelo `#FFCF25`, creme `#F7F5EE`, grafite `#251F18`, Outfit e DM Sans. Artes existentes foram reaproveitadas; não há catálogo fictício ou backend alternativo.
 
 Regras puras de pedidos, pagamento e senhas em `src/domain/` foram portadas do mesmo commit. A fidelidade nativa em aparelhos físicos deve ser comparada tela a tela; diferenças de fonte, teclado e safe area exigem QA próprio de cada plataforma.
+
+
+## Identidade Elevadoor
+O nome exibido ao usuário (incluindo ícone na tela inicial, título do app e mensagens) é **Elevadoor**.
+Os identificadores técnicos legados `com.wrodolfull.condovery`, `condovery-app` e
+`condovery://auth/callback` são mantidos para preservar atualizações de instalações
+existentes e o fluxo OAuth atual. A alteração desses identificadores exige coordenação
+com EAS, Supabase Auth e novas builds distribuídas.

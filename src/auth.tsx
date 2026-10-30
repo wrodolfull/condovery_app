@@ -206,7 +206,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         google: async () => {
           if (Constants.executionEnvironment === "storeClient")
             throw new Error(
-              "Use a build de desenvolvimento do Condovery para entrar com Google.",
+              "Use a build de desenvolvimento do Elevadoor para entrar com Google.",
             );
           const hex = async () =>
             Array.from(await Crypto.getRandomBytesAsync(32), (b) =>

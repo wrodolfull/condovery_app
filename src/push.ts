@@ -20,7 +20,7 @@ export function usePush(listen = true) {
       if (!compatible()) {
         if (ask)
           throw new Error(
-            "Notificações push precisam da build do Condovery em um aparelho físico.",
+            "Notificações push precisam da build do Elevadoor em um aparelho físico.",
           );
         return;
       }

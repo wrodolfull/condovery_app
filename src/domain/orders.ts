@@ -149,7 +149,7 @@ export function orderMessage(order: {
   payment_method?: "pix" | "credit_card" | "debit_card" | "cash" | null;
 }): string {
   const lines = [
-    "Olá! Fiz um pedido pelo Condovery.",
+    "Olá! Fiz um pedido pelo Elevadoor.",
     "",
     "Pedido #" + order.code + " — " + order.shop,
     "Morador: " + order.buyer,
