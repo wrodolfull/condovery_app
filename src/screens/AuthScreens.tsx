@@ -1,12 +1,20 @@
 import React, { useEffect, useState } from "react";
-import { Image, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
-import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "../auth";
 import { Button, ErrorBox, Field, Screen, T } from "../ui";
 import { colors } from "../theme";
 import { passwordStatus } from "../domain/password-policy";
 import { openWeb } from "../external";
+import {
+  AuthDivider,
+  AuthIntro,
+  AuthPrivacy,
+  AuthSwitch,
+  GoogleButton,
+  WelcomeMark,
+} from "../components/AuthVisuals";
+
 export function Login() {
   const auth = useAuth();
   const [email, setEmail] = useState(""),
@@ -28,75 +36,73 @@ export function Login() {
     }
   };
   return (
-    <Screen>
-      <LinearGradient
-        colors={["#F96036", "#FF8550"]}
-        style={{ borderRadius: 28, padding: 25, gap: 14 }}
-      >
-        <T heading style={{ fontSize: 29, lineHeight: 34, color: "white" }}>
-          Seu condomínio mais perto de você!
-        </T>
-        <T style={{ color: "#FFF2EA" }}>
-          Compre dos seus vizinhos. Apoie comércios locais. Receba no seu
-          condomínio.
-        </T>
-        <Image
-          source={require("../../assets/images/hero.png")}
-          style={{ height: 155, width: "100%" }}
-          resizeMode="contain"
-        />
-      </LinearGradient>
-      <View>
-        <T heading style={{ fontSize: 28, lineHeight: 36 }}>
+    <Screen title="Entrar">
+      <AuthIntro />
+      <View style={{ gap: 7 }}>
+        <WelcomeMark />
+        <T heading style={{ fontSize: 28, lineHeight: 34, letterSpacing: -0.75 }}>
           Bem-vindo(a)!
         </T>
-        <T style={{ color: colors.muted }}>Acesse sua conta para continuar.</T>
+        <T style={{ color: colors.muted, fontSize: 13 }}>
+          Acesse sua conta para continuar.
+        </T>
       </View>
       <ErrorBox message={error || auth.connectionError} />
-      <Button
-        title="Entrar com Google"
-        secondary
+      <View style={{ gap: 15 }}>
+        <Field
+          label="E-mail"
+          placeholder="seuemail@exemplo.com"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoComplete="email"
+        />
+        <Field
+          label="Senha"
+          placeholder="Sua senha"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          autoComplete="current-password"
+        />
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push("/recuperar")}
+          style={{ alignSelf: "flex-end", paddingVertical: 5 }}
+        >
+          <T bold style={{ color: "#A9502D", fontSize: 12 }}>
+            Esqueci minha senha
+          </T>
+        </Pressable>
+        <Button
+          title="Entrar com e-mail"
+          busy={busy}
+          disabled={!email.trim() || !password}
+          onPress={() =>
+            void run(() => auth.login(email.trim().toLowerCase(), password))
+          }
+        />
+      </View>
+      <AuthDivider />
+      <GoogleButton
         busy={busy}
         onPress={() => void run(async () => {
           const result = await auth.google();
           if (result === "signup") router.replace("/cadastro");
         })}
       />
-      <Field
-        label="E-mail"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-        autoComplete="email"
-      />
-      <Field
-        label="Senha"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        autoComplete="current-password"
-      />
-      <Pressable onPress={() => router.push("/recuperar")}>
-        <T style={{ textAlign: "right", fontSize: 12 }}>Esqueci minha senha</T>
-      </Pressable>
-      <Button
-        title="Entrar com e-mail"
-        busy={busy}
-        disabled={!email || !password}
-        onPress={() =>
-          void run(() => auth.login(email.trim().toLowerCase(), password))
-        }
-      />
-      <Button
-        title="Cadastrar conta"
-        secondary
+      <AuthSwitch
+        question="Ainda não tem cadastro?"
+        action="Cadastre-se"
         onPress={() => router.push("/cadastro")}
       />
+      <AuthPrivacy />
       <LegalLinks />
     </Screen>
   );
 }
+
 function LegalLinks() {
   const { api } = useAuth();
   return (
@@ -119,6 +125,7 @@ function LegalLinks() {
     </T>
   );
 }
+
 export function Register() {
   const auth = useAuth();
   const [form, setForm] = useState({
@@ -136,8 +143,7 @@ export function Register() {
     [error, setError] = useState(""),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false);
-  // Derive the Google identity without updating state inside an effect:
-  // the signup flow may return while this screen is already mounted.
+  // Google can return while the registration screen is already mounted.
   const verifiedEmail = auth.googleSignup?.email ?? form.email;
   const suggestedName = form.name || auth.googleSignup?.name || "";
   const set = (key: keyof typeof form, value: string) =>
@@ -156,43 +162,34 @@ export function Register() {
   const policy = passwordStatus(form.password);
   return (
     <Screen title="Cadastrar conta" back>
-      <T heading style={{ fontSize: 26 }}>
-        Informações do morador
-      </T>
+      <AuthIntro compact />
+      <View style={{ gap: 7 }}>
+        <WelcomeMark />
+        <T heading style={{ fontSize: 27, lineHeight: 34, letterSpacing: -0.75 }}>
+          {auth.googleSignup ? "Informações do morador" : "Cadastrar conta"}
+        </T>
+        <T style={{ color: colors.muted, fontSize: 13 }}>
+          {auth.googleSignup
+            ? "Seu e-mail já está confirmado. Informe os dados do condomínio para entrar."
+            : "Crie sua conta e descubra o que seus vizinhos oferecem."}
+        </T>
+      </View>
       <ErrorBox message={error} />
       {message ? (
-        <>
-          <T>{message}</T>
+        <View style={{ gap: 15 }}>
+          <T style={{ color: colors.green }}>{message}</T>
           <Button
             title="Voltar para entrar"
             onPress={() => router.replace("/entrar")}
           />
-        </>
+        </View>
       ) : (
         <>
-          {!auth.googleSignup ? (
-            <>
-              <T style={{ color: colors.muted }}>
-                Cadastre-se usando sua conta Google e complete os dados do condomínio.
-              </T>
-              <Button
-                title="Cadastrar com Google"
-                secondary
-                busy={busy}
-                onPress={() => void run(async () => {
-                  const result = await auth.google();
-                  if (result === "login") router.replace("/");
-                })}
-              />
-              <T style={{ textAlign: "center", color: colors.muted }}>
-                Ou cadastre-se com e-mail e senha
-              </T>
-            </>
-          ) : (
-            <View style={{ gap: 10 }}>
+          {auth.googleSignup && (
+            <View style={{ gap: 12 }}>
               <T style={{ color: colors.green }}>
-                Google confirmado: {auth.googleSignup.email}. Informe o código
-                do condomínio e seus dados para concluir o cadastro.
+                Google confirmado: {auth.googleSignup.email}. Complete os dados
+                do condomínio para concluir seu cadastro.
               </T>
               <Button
                 title="Usar outra conta"
@@ -208,141 +205,191 @@ export function Register() {
               />
             </View>
           )}
-          <Field
-            label="Código do condomínio"
-            value={form.invite}
-            autoCapitalize="none"
-            maxLength={150}
-            onChangeText={(v) => {
-              set("invite", v);
-              setCondo(null);
-              set("tower", "");
-            }}
-          />
-          <Button
-            title="Verificar condomínio"
-            busy={busy}
-            secondary
-            onPress={() =>
-              void run(async () =>
-                setCondo(
-                  await auth.api.request(
-                    "public/condominium",
-                    "POST",
-                    { invite: form.invite },
-                    true,
+          <View style={{ gap: 15 }}>
+            <Field
+              label="Nome completo"
+              placeholder="Como podemos chamar você?"
+              value={suggestedName}
+              onChangeText={(v) => set("name", v)}
+              maxLength={90}
+              autoComplete="name"
+            />
+            <Field
+              label="WhatsApp"
+              placeholder="(11) 99999-9999"
+              value={form.phone}
+              onChangeText={(v) => set("phone", v)}
+              keyboardType="phone-pad"
+              maxLength={20}
+            />
+            <Field
+              label="Código de convite"
+              placeholder="Código fornecido pelo condomínio"
+              value={form.invite}
+              autoCapitalize="none"
+              maxLength={150}
+              onChangeText={(v) => {
+                set("invite", v);
+                setCondo(null);
+                set("tower", "");
+              }}
+            />
+            <Button
+              title="Verificar condomínio"
+              busy={busy}
+              secondary
+              disabled={!form.invite.trim()}
+              onPress={() =>
+                void run(async () =>
+                  setCondo(
+                    await auth.api.request(
+                      "public/condominium",
+                      "POST",
+                      { invite: form.invite },
+                      true,
+                    ),
                   ),
-                ),
-              )
-            }
-          />
-          {condo && (
-            <T bold style={{ color: colors.green }}>
-              {condo.name}
-            </T>
-          )}
-          <Field
-            label="Nome"
-            value={suggestedName}
-            onChangeText={(v) => set("name", v)}
-            maxLength={90}
-            autoComplete="name"
-          />
-          <Field
-            label="E-mail"
-            value={verifiedEmail}
-            editable={!auth.googleSignup}
-            onChangeText={(v) => set("email", v)}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoComplete="email"
-          />
-          <Field
-            label="WhatsApp com DDD"
-            value={form.phone}
-            onChangeText={(v) => set("phone", v)}
-            keyboardType="phone-pad"
-            maxLength={20}
-          />
-          <T bold>Torre</T>
-          <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
-            {condo?.towers.map((t) => (
-              <Pressable
-                key={t}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: form.tower === t }}
-                onPress={() => set("tower", t)}
-                style={{
-                  padding: 10,
-                  borderRadius: 99,
-                  backgroundColor: form.tower === t ? colors.yellow : "white",
-                }}
-              >
-                <T>{t}</T>
-              </Pressable>
-            ))}
-          </View>
-          <Field
-            label="Apartamento"
-            value={form.apartment}
-            onChangeText={(v) => set("apartment", v)}
-            maxLength={24}
-          />
-          {!auth.googleSignup && (
-            <>
-              <Field
-                label="Senha"
-                value={form.password}
-                onChangeText={(v) => set("password", v)}
-                secureTextEntry
-                maxLength={100}
-                autoComplete="new-password"
-              />
-              <View>
-                {policy.requirements.map((r) => (
-                  <T
-                    key={r.id}
+                )
+              }
+            />
+            {condo && (
+              <View style={{
+                backgroundColor: "#EAF7EF",
+                borderRadius: 12,
+                padding: 12,
+              }}>
+                <T bold style={{ color: colors.green }}>
+                  {condo.name}
+                </T>
+              </View>
+            )}
+            <View style={{ gap: 8 }}>
+              <T bold style={{ fontSize: 12 }}>Torre</T>
+              <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+                {condo?.towers.map((t) => (
+                  <Pressable
+                    key={t}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: form.tower === t }}
+                    onPress={() => set("tower", t)}
                     style={{
-                      fontSize: 12,
-                      color: r.met ? colors.green : colors.muted,
+                      paddingHorizontal: 15,
+                      paddingVertical: 11,
+                      borderRadius: 99,
+                      borderWidth: 1,
+                      borderColor: form.tower === t ? "#D8B32A" : colors.line,
+                      backgroundColor: form.tower === t ? colors.yellow : "#FFFFFF",
                     }}
                   >
-                    {r.met ? "✓" : "○"} {r.label}
-                  </T>
+                    <T bold style={{ fontSize: 12 }}>{t}</T>
+                  </Pressable>
                 ))}
               </View>
+              {!condo && (
+                <T style={{ color: colors.muted, fontSize: 11 }}>
+                  Verifique o código de convite para selecionar a torre.
+                </T>
+              )}
+            </View>
+            <Field
+              label="Apartamento"
+              placeholder="Ex.: 83"
+              value={form.apartment}
+              onChangeText={(v) => set("apartment", v)}
+              maxLength={24}
+            />
+            <T style={{ color: colors.muted, fontSize: 11 }}>
+              Com o código do condomínio, você entra sem aguardar aprovação.
+            </T>
+            <Field
+              label="E-mail"
+              placeholder="seuemail@exemplo.com"
+              value={verifiedEmail}
+              editable={!auth.googleSignup}
+              onChangeText={(v) => set("email", v)}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+            />
+            {!auth.googleSignup && (
+              <>
+                <Field
+                  label="Senha"
+                  placeholder="Mínimo de 8 caracteres"
+                  value={form.password}
+                  onChangeText={(v) => set("password", v)}
+                  secureTextEntry
+                  maxLength={100}
+                  autoComplete="new-password"
+                />
+                <View style={{ gap: 2 }}>
+                  {policy.requirements.map((r) => (
+                    <T
+                      key={r.id}
+                      style={{
+                        fontSize: 12,
+                        color: r.met ? colors.green : colors.muted,
+                      }}
+                    >
+                      {r.met ? "✓" : "○"} {r.label}
+                    </T>
+                  ))}
+                </View>
+              </>
+            )}
+            <Button
+              title="Criar minha conta"
+              busy={busy}
+              disabled={
+                !condo || !form.tower ||
+                !suggestedName.trim() || !verifiedEmail.trim() ||
+                !form.phone.trim() || !form.apartment.trim() ||
+                (!auth.googleSignup && !policy.valid)
+              }
+              onPress={() =>
+                void run(async () => {
+                  if (auth.googleSignup) {
+                    await auth.finishSignup({
+                      ...form, email: verifiedEmail, name: suggestedName,
+                    });
+                    return;
+                  }
+                  const r = await auth.api.request<{ message: string }>(
+                    "auth/register",
+                    "POST",
+                    { ...form, email: form.email.trim().toLowerCase() },
+                    true,
+                  );
+                  setMessage(r.message);
+                })
+              }
+            />
+          </View>
+          {!auth.googleSignup && (
+            <>
+              <AuthDivider />
+              <GoogleButton
+                busy={busy}
+                onPress={() => void run(async () => {
+                  const result = await auth.google();
+                  if (result === "login") router.replace("/");
+                })}
+              />
             </>
           )}
-          <Button
-            title="Criar minha conta"
-            busy={busy}
-            disabled={
-              !condo || !form.tower || (!auth.googleSignup && !policy.valid)
-            }
-            onPress={() =>
-              void run(async () => {
-                if (auth.googleSignup) {
-                  await auth.finishSignup({
-                    ...form, email: verifiedEmail, name: suggestedName,
-                  });
-                  return;
-                }
-                const r = await auth.api.request<{ message: string }>(
-                  "auth/register",
-                  "POST",
-                  { ...form, email: form.email.trim().toLowerCase() },
-                  true,
-                );
-                setMessage(r.message);
-              })
-            }
+          <AuthSwitch
+            question="Já possui uma conta?"
+            action="Faça login"
+            onPress={() => router.replace("/entrar")}
           />
           <LegalLinks />
+          <AuthPrivacy />
         </>
       )}
     </Screen>
   );
 }
+
 export function Recover() {
   const { api } = useAuth();
   const [email, setEmail] = useState(""),

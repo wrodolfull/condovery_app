@@ -16,9 +16,10 @@ test("Elevadoor is the app display name, wordmark and customer-facing name",()=>
     "Legacy display name found in "+path);
   assert.match(read("src/domain/orders.ts"),/pedido pelo Elevadoor/);
 });
-test("legacy authentication deep link and native IDs remain stable through a brand-only release",()=>{
+test("new app IDs match Elevadoor while the existing auth deep link stays compatible",()=>{
   const config=read("app.config.ts");
   assert.match(config,/scheme: "condovery"/);
-  assert.match(config,/bundleIdentifier: "com.wrodolfull.condovery"/);
+  assert.match(config,/bundleIdentifier: "pro.elevadoor.app"/);
+  assert.match(config,/package: "pro.elevadoor.app"/);
   assert.match(read("src/auth.tsx"),/condovery:\/\/auth\/callback/);
 });

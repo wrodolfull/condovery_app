@@ -457,14 +457,20 @@ test("ads, fairs and inline home search use the same marketplace structure", asy
   expect(impressions).toEqual([]); // offscreen ads are not counted on mount
   const adHeading = page.getByText("Ofertas perto de você", { exact: true });
   await adHeading.scrollIntoViewIfNeeded();
-  await expect(page.getByText("PUBLICIDADE", { exact: true })).toBeVisible();
+  // Native paging keeps adjacent ads mounted; select the active slide,
+  // rather than matching the duplicated label in every rendered slide.
+  await expect(page.getByText("PUBLICIDADE", { exact: true }).first()).toBeVisible();
   await expect(
-    page.getByText("Rua das Flores, 10", { exact: true }),
+    page.getByText("Rua das Flores, 10", { exact: true }).first(),
   ).toBeVisible();
+  const firstDot = page.getByRole("button", { name: "Anúncio 1", exact: true });
+  const secondDot = page.getByRole("button", { name: "Anúncio 2", exact: true });
+  await expect(firstDot).toHaveAttribute("aria-selected", "true");
   await expect
     .poll(() => impressions.filter((p) => p.includes("ad-0")).length)
     .toBe(1);
-  await page.getByRole("button", { name: "Anúncio 2", exact: true }).click();
+  await secondDot.click();
+  await expect(secondDot).toHaveAttribute("aria-selected", "true");
   await expect(
     page.getByText("Oferta da vizinhança 2", { exact: true }),
   ).toBeVisible();
@@ -472,7 +478,8 @@ test("ads, fairs and inline home search use the same marketplace structure", asy
     page.getByText("Ofertas da semana", { exact: true }),
   ).toHaveCount(0);
   await page.screenshot({ path: info.outputPath("advertisement.png") });
-  await page.getByRole("button", { name: "Anúncio 1", exact: true }).click();
+  await firstDot.click();
+  await expect(firstDot).toHaveAttribute("aria-selected", "true");
   await expect(
     page.getByText("Oferta da vizinhança 1", { exact: true }),
   ).toBeVisible();
@@ -608,17 +615,17 @@ test("sign-up checks condominium invitation before enabling account creation", a
   await page.goto(origin);
   // Google login must be visible even when the optional mobile/config
   // discovery endpoint is absent or replies google:false.
-  await expect(page.getByRole("button", { name: "Entrar com Google" })).toBeVisible();
-  await page.getByRole("button", { name: "Cadastrar conta" }).click();
-  await expect(page.getByRole("button", { name: "Cadastrar com Google" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continuar com Google" })).toBeVisible();
+  await page.getByRole("button", { name: "Cadastre-se" }).click();
+  await expect(page.getByRole("button", { name: "Continuar com Google" })).toBeVisible();
   const create = page.getByRole("button", { name: "Criar minha conta" });
   await expect(create).toBeDisabled();
-  await page.getByLabel("Código do condomínio").fill("TESTE-CONDOMINIO-123");
+  await page.getByLabel("Código de convite").fill("TESTE-CONDOMINIO-123");
   await page.getByRole("button", { name: "Verificar condomínio" }).click();
   await expect(page.getByText("Condomínio Teste")).toBeVisible();
-  await page.getByLabel("Nome", { exact: true }).fill("Morador Teste");
+  await page.getByLabel("Nome completo").fill("Morador Teste");
   await page.getByLabel("E-mail", { exact: true }).last().fill("teste@example.com");
-  await page.getByLabel("WhatsApp com DDD").fill("11999991234");
+  await page.getByLabel("WhatsApp").fill("11999991234");
   await page.getByRole("radio", { name: "Torre A" }).click();
   await page.getByLabel("Apartamento").fill("101");
   await page.getByLabel("Senha", { exact: true }).last().fill("SenhaForte123!");

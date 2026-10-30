@@ -1,5 +1,6 @@
 
 import type { ExpoConfig } from "expo/config";
+import { existsSync } from "node:fs";
 
 const config: ExpoConfig = {
   name: "Elevadoor",
@@ -21,8 +22,10 @@ const config: ExpoConfig = {
 
   android: {
     package: "pro.elevadoor.app",
-    ...(process.env.GOOGLE_SERVICES_FILE
-      ? { googleServicesFile: process.env.GOOGLE_SERVICES_FILE }
+    // Local EAS builds do not download remote secret file variables.
+    // Prefer the explicit EAS file path; otherwise use the local Firebase file.
+    ...(process.env.GOOGLE_SERVICES_FILE || existsSync("./google-services.json")
+      ? { googleServicesFile: process.env.GOOGLE_SERVICES_FILE || "./google-services.json" }
       : {}),
   },
 
