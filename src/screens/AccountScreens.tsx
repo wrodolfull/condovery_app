@@ -138,7 +138,7 @@ export function Account() {
               Você poderá entrar novamente quando quiser. Seus pedidos e suas informações continuarão salvos.
             </T>
             <View style={{ width: "100%", gap: 10, marginTop: 8 }}>
-              <Button title="Continuar no Condovery"
+              <Button title="Continuar no Elevadoor"
                 disabled={loggingOut}
                 onPress={() => setLogoutOpen(false)} />
               <Button title={loggingOut ? "Saindo..." : "Sim, sair da conta"}
@@ -223,7 +223,7 @@ export function Account() {
       <View style={{ gap: 8 }}>
         <T heading style={{ fontSize: 20 }}>Privacidade e termos</T>
         <T style={{ color: colors.muted, fontSize: 12 }}>
-          Consulte como seus dados são tratados e as regras de uso do Condovery.
+          Consulte como seus dados são tratados e as regras de uso do Elevadoor.
         </T>
         <Button
           title="Termos de uso"
