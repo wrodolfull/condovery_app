@@ -65,8 +65,6 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
   const safeCart = cartReady?cart:empty;
   useEffect(() => {
     let active = true;
-    setLoadedScope(null);
-    setCart(empty);
     if (!scope) return;
     void loadCart(scope)
       .then((value) => {
@@ -83,8 +81,8 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
               i.quantity >= 1 &&
               i.quantity <= 30,
           )
-        )
-          setCart({ ...v, pending: v.pending ?? null });
+        ) setCart({ ...v, pending: v.pending ?? null });
+        else setCart(empty);
       })
       .catch(() => {})
       .finally(() => {
