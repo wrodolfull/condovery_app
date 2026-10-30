@@ -28,6 +28,7 @@ type Auth = {
   google: () => Promise<GoogleResult>;
   completeGoogle: (url: string) => Promise<Exclude<GoogleResult, "cancelled">>;
   finishSignup: (values: Record<string, string>) => Promise<void>;
+  cancelGoogleSignup: () => void;
 };
 const Context = createContext<Auth | null>(null);
 WebBrowser.maybeCompleteAuthSession();
@@ -183,6 +184,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         connectionError,
         googleSignup,
+        cancelGoogleSignup: () => setGoogleSignup(null),
         refresh,
         completeGoogle,
         login: async (email, password) => {
