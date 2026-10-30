@@ -38,7 +38,7 @@ export class ApiClient {
   ): Promise<T> {
     if (!this.origin)
       throw new Error(
-        "Configure EXPO_PUBLIC_API_URL para conectar ao Condovery.",
+        "Configure EXPO_PUBLIC_API_URL para conectar ao Elevadoor.",
       );
     if (
       !/^([a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]+$/.test(path.split("?")[0]) ||
