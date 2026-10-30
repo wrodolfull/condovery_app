@@ -16,7 +16,7 @@ export const helpArticles: HelpArticle[] = [
     topic: "Conta e acesso",
     title: "Como criar minha conta?",
     steps: [
-      "Na tela inicial do Condovery, toque em Cadastre-se ou Criar minha conta.",
+      "Na tela inicial do Elevadoor, toque em Cadastre-se ou Criar minha conta.",
       "Preencha seu nome, WhatsApp, e-mail e crie uma senha segura.",
       "Informe o código de convite fornecido pelo condomínio e selecione sua torre e apartamento.",
       "Toque em Criar minha conta e confirme o e-mail, se solicitado.",
@@ -28,9 +28,9 @@ export const helpArticles: HelpArticle[] = [
     id: "entrar",
     area: "resident",
     topic: "Conta e acesso",
-    title: "Como entrar no Condovery?",
+    title: "Como entrar no Elevadoor?",
     steps: [
-      "Abra o Condovery e escolha Entrar com e-mail.",
+      "Abra o Elevadoor e escolha Entrar com e-mail.",
       "Digite o e-mail cadastrado e a senha.",
       "Toque em Entrar com e-mail. Se a opção estiver disponível, você também pode usar Continuar com Google.",
     ],
@@ -129,7 +129,7 @@ export const helpArticles: HelpArticle[] = [
       "Prossiga para registrar o pedido e abra o WhatsApp.",
       "No WhatsApp, toque em Enviar para encaminhar a mensagem ao vendedor.",
     ],
-    note: "O pedido fica registrado no Condovery. A loja é responsável por confirmar disponibilidade, entrega e pagamento.",
+    note: "O pedido fica registrado no Elevadoor. A loja é responsável por confirmar disponibilidade, entrega e pagamento.",
   },
   {
     id: "entrega-ou-retirada",
@@ -339,7 +339,7 @@ export const helpArticles: HelpArticle[] = [
       "Converse com o cliente pelo WhatsApp para combinar o pagamento e a entrega.",
       "Registre a conclusão do pedido no Painel do vendedor depois de atender o cliente.",
     ],
-    note: "O Condovery registra o pedido, mas não processa o pagamento entre morador e vendedor.",
+    note: "O Elevadoor registra o pedido, mas não processa o pagamento entre morador e vendedor.",
   },
   {
     id: "moderar-avaliacao",
