@@ -55,13 +55,18 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
       viewer ? "favorites" : null,
     );
   const [cart, setCart] = useState<Cart>(empty),
-    [cartReady, setReady] = useState(false);
+    [loadedScope, setLoadedScope] = useState<string|null>(null);
   const checkoutLock = useRef(false);
   const scope = viewer
     ? "cart." + viewer.id + "." + viewer.condominium_id
     : null;
+  // Never expose or save an old account's cart under a newly active tenant.
+  const cartReady = scope!==null && loadedScope===scope;
+  const safeCart = cartReady?cart:empty;
   useEffect(() => {
     let active = true;
+    setLoadedScope(null);
+    setCart(empty);
     if (!scope) return;
     void loadCart(scope)
       .then((value) => {
@@ -83,15 +88,15 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
       })
       .catch(() => {})
       .finally(() => {
-        if (active) setReady(true);
+        if (active) setLoadedScope(scope);
       });
     return () => {
       active = false;
     };
   }, [scope]);
   useEffect(() => {
-    if (scope && cartReady) void saveCart(scope, cart).catch(() => {});
-  }, [cart, scope, cartReady]);
+    if (scope && loadedScope===scope) void saveCart(scope, cart).catch(() => {});
+  }, [cart, scope, loadedScope]);
   const ensure = () => {
     if (cart.pending || checkoutLock.current)
       throw new Error(
@@ -104,7 +109,7 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
       value={{
         home,
         favorites,
-        cart,
+        cart: safeCart,
         cartReady,
         toggleFavorite: async (id) => {
           const exists = favorites.data?.ids.includes(id);
