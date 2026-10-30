@@ -608,17 +608,17 @@ test("sign-up checks condominium invitation before enabling account creation", a
   await page.goto(origin);
   // Google login must be visible even when the optional mobile/config
   // discovery endpoint is absent or replies google:false.
-  await expect(page.getByRole("button", { name: "Entrar com Google" })).toBeVisible();
-  await page.getByRole("button", { name: "Cadastrar conta" }).click();
-  await expect(page.getByRole("button", { name: "Cadastrar com Google" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continuar com Google" })).toBeVisible();
+  await page.getByRole("button", { name: "Cadastre-se" }).click();
+  await expect(page.getByRole("button", { name: "Continuar com Google" })).toBeVisible();
   const create = page.getByRole("button", { name: "Criar minha conta" });
   await expect(create).toBeDisabled();
-  await page.getByLabel("Código do condomínio").fill("TESTE-CONDOMINIO-123");
+  await page.getByLabel("Código de convite").fill("TESTE-CONDOMINIO-123");
   await page.getByRole("button", { name: "Verificar condomínio" }).click();
   await expect(page.getByText("Condomínio Teste")).toBeVisible();
-  await page.getByLabel("Nome", { exact: true }).fill("Morador Teste");
+  await page.getByLabel("Nome completo").fill("Morador Teste");
   await page.getByLabel("E-mail", { exact: true }).last().fill("teste@example.com");
-  await page.getByLabel("WhatsApp com DDD").fill("11999991234");
+  await page.getByLabel("WhatsApp").fill("11999991234");
   await page.getByRole("radio", { name: "Torre A" }).click();
   await page.getByLabel("Apartamento").fill("101");
   await page.getByLabel("Senha", { exact: true }).last().fill("SenhaForte123!");
