@@ -42,9 +42,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [connectionError, setConnectionError] = useState(""),
     [googleSignup, setGoogleSignup] = useState<Signup | null>(null);
   const exchange = useRef<Promise<"login" | "signup"> | null>(null);
+  const completedGoogle = useRef<{ key: string; outcome: "login" | "signup" } | null>(null);
   const activeToken=useRef<string|null>(token);
   const clear = useCallback(async () => {
     activeToken.current=null;
+    completedGoogle.current=null;
     setToken(null);
     setViewer(null);
     setGoogleSignup(null);
@@ -113,15 +115,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setViewer(r.viewer);
   };
   const completeGoogle = async (url: string) => {
+    const u = new URL(url);
+    if (
+      u.protocol !== "condovery:" ||
+      u.hostname !== "auth" ||
+      u.pathname !== "/callback"
+    )
+      throw new Error("Retorno inválido.");
+    // iOS and Android can deliver the callback via both WebBrowser and
+    // Expo Router. A grant already exchanged in this session is not
+    // exchanged twice or mistaken for an expired attempt.
+    const key = u.searchParams.get("state") + ":" + u.searchParams.get("code");
+    if (completedGoogle.current?.key === key) return completedGoogle.current.outcome;
     if (exchange.current) return exchange.current;
     const work = async () => {
-      const u = new URL(url);
-      if (
-        u.protocol !== "condovery:" ||
-        u.hostname !== "auth" ||
-        u.pathname !== "/callback"
-      )
-        throw new Error("Retorno inválido.");
       const saved = await secure.get("oauth");
       if (!saved) throw new Error("Acesso expirado. Entre novamente.");
       const flow = JSON.parse(saved) as {
@@ -160,7 +167,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       throw new Error("Resposta de acesso inválida.");
     };
-    exchange.current = work().finally(() => {
+    exchange.current = work().then((outcome) => {
+      completedGoogle.current = { key, outcome };
+      return outcome;
+    }).finally(() => {
       exchange.current = null;
     });
     return exchange.current;
@@ -232,6 +242,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .replace(/\+/g, "-")
             .replace(/\//g, "_")
             .replace(/=+$/, "");
+          completedGoogle.current = null;
           await secure.set(
             "oauth",
             JSON.stringify({ verifier, state, expires: Date.now() + 600000 }),
