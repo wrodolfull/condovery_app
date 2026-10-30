@@ -4,7 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { ShieldCheck, ShoppingBag } from "lucide-react-native";
 import Svg, { Path } from "react-native-svg";
 import { T } from "../ui";
-import { colors, fonts } from "../theme";
+import { colors } from "../theme";
 
 /** Auth presentation shared by login and registration; mirrors the web mobile design. */
 export function AuthIntro({ compact = false }: { compact?: boolean }) {
@@ -97,7 +97,7 @@ export function WelcomeMark() {
 
 function GoogleIcon() {
   return (
-    <Svg width={21} height={21} viewBox="0 0 24 24" aria-label="Google">
+    <Svg width={21} height={21} viewBox="0 0 24 24">
       <Path fill="#4285F4" d="M22.6 12.3c0-.8-.1-1.5-.2-2.3H12v4.4h6c-.3 1.4-1.1 2.5-2.4 3.2v2.7h3.9c2.2-2.1 3.1-4.8 3.1-8Z" />
       <Path fill="#34A853" d="M12 23c3 0 5.5-1 7.4-2.7l-3.9-2.7c-1.1.7-2.3 1.1-3.5 1.1-2.7 0-5-1.8-5.8-4.3h-4V17c1.8 3.6 5.5 6 9.8 6Z" />
       <Path fill="#FBBC05" d="M6.2 14.4a6.8 6.8 0 0 1 0-4.7V7h-4C1.4 8.6 1 10.3 1 12s.4 3.4 1.2 5l4-2.6Z" />
