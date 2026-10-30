@@ -189,10 +189,24 @@ export function Register() {
               </T>
             </>
           ) : (
-            <T style={{ color: colors.green }}>
-              Google confirmado: {auth.googleSignup.email}. Informe o código
-              do condomínio e seus dados para concluir o cadastro.
-            </T>
+            <View style={{ gap: 10 }}>
+              <T style={{ color: colors.green }}>
+                Google confirmado: {auth.googleSignup.email}. Informe o código
+                do condomínio e seus dados para concluir o cadastro.
+              </T>
+              <Button
+                title="Usar outra conta"
+                secondary
+                busy={busy}
+                onPress={() => {
+                  auth.cancelGoogleSignup();
+                  setForm((current) => ({
+                    ...current, name: "", email: "", password: "",
+                  }));
+                  setError("");
+                }}
+              />
+            </View>
           )}
           <Field
             label="Código do condomínio"
