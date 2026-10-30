@@ -233,14 +233,14 @@ export function Screen({
       <View style={[s.header, { paddingHorizontal: horizontal }]}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Condovery, início"
+          accessibilityLabel="Elevadoor, início"
           onPress={() => router.navigate("/")}
         >
           <T
             heading
             style={{ fontSize: width <= 420 ? 23 : 25, letterSpacing: -1.5 }}
           >
-            condovery<T style={{ fontSize: 27, color: colors.orange }}>.</T>
+            elevadoor<T style={{ fontSize: 27, color: colors.orange }}>.</T>
           </T>
         </Pressable>
         <View
