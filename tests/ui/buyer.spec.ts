@@ -606,7 +606,11 @@ test("sign-up checks condominium invitation before enabling account creation", a
     else throw Error("Unexpected request: " + endpoint);
   });
   await page.goto(origin);
+  // Google login must be visible even when the optional mobile/config
+  // discovery endpoint is absent or replies google:false.
+  await expect(page.getByRole("button", { name: "Entrar com Google" })).toBeVisible();
   await page.getByRole("button", { name: "Cadastrar conta" }).click();
+  await expect(page.getByRole("button", { name: "Cadastrar com Google" })).toBeVisible();
   const create = page.getByRole("button", { name: "Criar minha conta" });
   await expect(create).toBeDisabled();
   await page.getByLabel("Código do condomínio").fill("TESTE-CONDOMINIO-123");
