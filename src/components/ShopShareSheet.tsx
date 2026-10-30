@@ -7,7 +7,7 @@ import { T, alertError } from "../ui";
 
 type Props = { visible: boolean; onClose: () => void; shopName: string; url: string };
 export function ShopShareSheet({ visible, onClose, shopName, url }: Props) {
-  const message = "Conheça " + shopName + " no Condovery! " + url;
+  const message = "Conheça " + shopName + " no Elevadoor! " + url;
   const nativeShare = () => Share.share({ title: shopName, message, url }).then(onClose).catch(alertError);
   const launch = (link:string) => {
     void Linking.openURL(link).then(onClose).catch(() => void nativeShare());
