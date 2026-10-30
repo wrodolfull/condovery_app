@@ -136,17 +136,10 @@ export function Register() {
     [error, setError] = useState(""),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false);
-  // OAuth may finish while this screen is already mounted. Its verified
-  // identity must overwrite any user-supplied email before registration.
-  useEffect(() => {
-    if (!auth.googleSignup) return;
-    setForm((current) => ({
-      ...current,
-      name: auth.googleSignup!.name || current.name,
-      email: auth.googleSignup!.email,
-      password: "",
-    }));
-  }, [auth.googleSignup]);
+  // Derive the Google identity without updating state inside an effect:
+  // the signup flow may return while this screen is already mounted.
+  const verifiedEmail = auth.googleSignup?.email ?? form.email;
+  const suggestedName = form.name || auth.googleSignup?.name || "";
   const set = (key: keyof typeof form, value: string) =>
     setForm((v) => ({ ...v, [key]: value }));
   const run = async (fn: () => Promise<void>) => {
@@ -236,14 +229,14 @@ export function Register() {
           )}
           <Field
             label="Nome"
-            value={form.name}
+            value={suggestedName}
             onChangeText={(v) => set("name", v)}
             maxLength={90}
             autoComplete="name"
           />
           <Field
             label="E-mail"
-            value={form.email}
+            value={verifiedEmail}
             editable={!auth.googleSignup}
             onChangeText={(v) => set("email", v)}
             keyboardType="email-address"
@@ -315,7 +308,9 @@ export function Register() {
             onPress={() =>
               void run(async () => {
                 if (auth.googleSignup) {
-                  await auth.finishSignup(form);
+                  await auth.finishSignup({
+                    ...form, email: verifiedEmail, name: suggestedName,
+                  });
                   return;
                 }
                 const r = await auth.api.request<{ message: string }>(
