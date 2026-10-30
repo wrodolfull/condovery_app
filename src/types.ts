@@ -51,6 +51,8 @@ export type HomeData = {
   categories: Category[];
   shops: Shop[];
   products: Product[];
+  /** Optional to support app releases before the server rolls out Novidades. */
+  recentProducts?: Product[];
 };
 export type CommunityFair = {
   id: string;
