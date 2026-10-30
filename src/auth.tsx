@@ -15,6 +15,7 @@ import {expirationBelongsToCurrentLogin} from "./domain/session-expiry";
 import { secure } from "./storage";
 import type { Viewer } from "./types";
 type Signup = { signup_token: string; email: string; name: string };
+export type GoogleResult = "login" | "signup" | "cancelled";
 type Auth = {
   api: ApiClient;
   viewer: Viewer | null;
@@ -24,9 +25,10 @@ type Auth = {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
-  google: () => Promise<void>;
-  completeGoogle: (url: string) => Promise<void>;
+  google: () => Promise<GoogleResult>;
+  completeGoogle: (url: string) => Promise<Exclude<GoogleResult, "cancelled">>;
   finishSignup: (values: Record<string, string>) => Promise<void>;
+  cancelGoogleSignup: () => void;
 };
 const Context = createContext<Auth | null>(null);
 WebBrowser.maybeCompleteAuthSession();
@@ -40,10 +42,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [loading, setLoading] = useState(true),
     [connectionError, setConnectionError] = useState(""),
     [googleSignup, setGoogleSignup] = useState<Signup | null>(null);
-  const exchange = useRef<Promise<void> | null>(null);
+  const exchange = useRef<Promise<"login" | "signup"> | null>(null);
+  const completedGoogle = useRef<{ key: string; outcome: "login" | "signup" } | null>(null);
   const activeToken=useRef<string|null>(token);
   const clear = useCallback(async () => {
     activeToken.current=null;
+    completedGoogle.current=null;
     setToken(null);
     setViewer(null);
     setGoogleSignup(null);
@@ -112,15 +116,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setViewer(r.viewer);
   };
   const completeGoogle = async (url: string) => {
+    const u = new URL(url);
+    if (
+      u.protocol !== "condovery:" ||
+      u.hostname !== "auth" ||
+      u.pathname !== "/callback"
+    )
+      throw new Error("Retorno inválido.");
+    // iOS and Android can deliver the callback via both WebBrowser and
+    // Expo Router. A grant already exchanged in this session is not
+    // exchanged twice or mistaken for an expired attempt.
+    const key = u.searchParams.get("state") + ":" + u.searchParams.get("code");
+    if (completedGoogle.current?.key === key) return completedGoogle.current.outcome;
     if (exchange.current) return exchange.current;
     const work = async () => {
-      const u = new URL(url);
-      if (
-        u.protocol !== "condovery:" ||
-        u.hostname !== "auth" ||
-        u.pathname !== "/callback"
-      )
-        throw new Error("Retorno inválido.");
       const saved = await secure.get("oauth");
       if (!saved) throw new Error("Acesso expirado. Entre novamente.");
       const flow = JSON.parse(saved) as {
@@ -148,11 +157,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
         true,
       );
-      if (r.registration_required) setGoogleSignup(r);
-      else if (r.access_token) await accept(r.access_token);
-      else throw new Error("Resposta de acesso inválida.");
+      if (r.registration_required) {
+        if (!r.signup_token || !r.email) throw new Error("Resposta de cadastro inválida.");
+        setGoogleSignup(r);
+        return "signup" as const;
+      }
+      if (r.access_token) {
+        await accept(r.access_token);
+        return "login" as const;
+      }
+      throw new Error("Resposta de acesso inválida.");
     };
-    exchange.current = work().finally(() => {
+    exchange.current = work().then((outcome) => {
+      completedGoogle.current = { key, outcome };
+      return outcome;
+    }).finally(() => {
       exchange.current = null;
     });
     return exchange.current;
@@ -165,6 +184,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         connectionError,
         googleSignup,
+        cancelGoogleSignup: () => {
+          completedGoogle.current = null;
+          setGoogleSignup(null);
+        },
         refresh,
         completeGoogle,
         login: async (email, password) => {
@@ -224,6 +247,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .replace(/\+/g, "-")
             .replace(/\//g, "_")
             .replace(/=+$/, "");
+          completedGoogle.current = null;
           await secure.set(
             "oauth",
             JSON.stringify({ verifier, state, expires: Date.now() + 600000 }),
@@ -238,7 +262,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             r.url,
             "condovery://auth/callback",
           );
-          if (result.type === "success") await completeGoogle(result.url);
+          if (result.type === "success") return completeGoogle(result.url);
+          // Cancelling Google must not reuse an old PKCE verifier/state.
+          await secure.remove("oauth");
+          return "cancelled" as const;
         },
       }}
     >

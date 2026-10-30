@@ -12,14 +12,7 @@ export function Login() {
   const [email, setEmail] = useState(""),
     [password, setPassword] = useState(""),
     [error, setError] = useState(""),
-    [busy, setBusy] = useState(false),
-    [google, setGoogle] = useState(false);
-  useEffect(() => {
-    void auth.api
-      .request<{ google: boolean }>("mobile/config", "GET", undefined, true)
-      .then((r) => setGoogle(r.google))
-      .catch(() => {});
-  }, [auth.api]);
+    [busy, setBusy] = useState(false);
   useEffect(() => {
     if (auth.googleSignup) router.replace("/cadastro");
   }, [auth.googleSignup]);
@@ -60,14 +53,15 @@ export function Login() {
         <T style={{ color: colors.muted }}>Acesse sua conta para continuar.</T>
       </View>
       <ErrorBox message={error || auth.connectionError} />
-      {google && (
-        <Button
-          title="Continuar com Google"
-          secondary
-          busy={busy}
-          onPress={() => void run(auth.google)}
-        />
-      )}
+      <Button
+        title="Entrar com Google"
+        secondary
+        busy={busy}
+        onPress={() => void run(async () => {
+          const result = await auth.google();
+          if (result === "signup") router.replace("/cadastro");
+        })}
+      />
       <Field
         label="E-mail"
         value={email}
@@ -142,6 +136,10 @@ export function Register() {
     [error, setError] = useState(""),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false);
+  // Derive the Google identity without updating state inside an effect:
+  // the signup flow may return while this screen is already mounted.
+  const verifiedEmail = auth.googleSignup?.email ?? form.email;
+  const suggestedName = form.name || auth.googleSignup?.name || "";
   const set = (key: keyof typeof form, value: string) =>
     setForm((v) => ({ ...v, [key]: value }));
   const run = async (fn: () => Promise<void>) => {
@@ -172,6 +170,44 @@ export function Register() {
         </>
       ) : (
         <>
+          {!auth.googleSignup ? (
+            <>
+              <T style={{ color: colors.muted }}>
+                Cadastre-se usando sua conta Google e complete os dados do condomínio.
+              </T>
+              <Button
+                title="Cadastrar com Google"
+                secondary
+                busy={busy}
+                onPress={() => void run(async () => {
+                  const result = await auth.google();
+                  if (result === "login") router.replace("/");
+                })}
+              />
+              <T style={{ textAlign: "center", color: colors.muted }}>
+                Ou cadastre-se com e-mail e senha
+              </T>
+            </>
+          ) : (
+            <View style={{ gap: 10 }}>
+              <T style={{ color: colors.green }}>
+                Google confirmado: {auth.googleSignup.email}. Informe o código
+                do condomínio e seus dados para concluir o cadastro.
+              </T>
+              <Button
+                title="Usar outra conta"
+                secondary
+                busy={busy}
+                onPress={() => {
+                  auth.cancelGoogleSignup();
+                  setForm((current) => ({
+                    ...current, name: "", email: "", password: "",
+                  }));
+                  setError("");
+                }}
+              />
+            </View>
+          )}
           <Field
             label="Código do condomínio"
             value={form.invite}
@@ -207,14 +243,14 @@ export function Register() {
           )}
           <Field
             label="Nome"
-            value={form.name}
+            value={suggestedName}
             onChangeText={(v) => set("name", v)}
             maxLength={90}
             autoComplete="name"
           />
           <Field
             label="E-mail"
-            value={form.email}
+            value={verifiedEmail}
             editable={!auth.googleSignup}
             onChangeText={(v) => set("email", v)}
             keyboardType="email-address"
@@ -286,7 +322,9 @@ export function Register() {
             onPress={() =>
               void run(async () => {
                 if (auth.googleSignup) {
-                  await auth.finishSignup(form);
+                  await auth.finishSignup({
+                    ...form, email: verifiedEmail, name: suggestedName,
+                  });
                   return;
                 }
                 const r = await auth.api.request<{ message: string }>(
@@ -371,7 +409,7 @@ export function GoogleCallback() {
       if (typeof v === "string") u.searchParams.set(k, v);
     void auth
       .completeGoogle(u.toString())
-      .then(() => router.replace(auth.googleSignup ? "/cadastro" : "/"))
+      .then((result) => router.replace(result === "signup" ? "/cadastro" : "/"))
       .catch((e) => setError(e.message)); // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return (

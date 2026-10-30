@@ -43,6 +43,14 @@ npm start
 
 Expo Go pode ser usado para conferir as telas e o fluxo por e-mail quando compatível com o SDK instalado. **Google e push remoto precisam de uma development build**. A prévia web é útil para QA de layout; ela não substitui o site original e não altera a política CORS do backend para permitir acesso entre origens.
 
+### Login e cadastro Google
+
+Na tela **Entrar**, toque em **Entrar com Google**. Na tela **Cadastrar conta**, toque em **Cadastrar com Google**. Depois de autorizar, quem já tem uma conta aprovada é autenticado normalmente. Quem ainda não tem conta precisa concluir o cadastro com **código de convite, WhatsApp, torre e apartamento**; o e-mail do Google é confirmado e não pode ser substituído manualmente.
+
+O backend utiliza o mesmo **Supabase Auth** do site. Verifique `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `APP_URL` e o provedor Google habilitado no projeto. Em **Supabase → Authentication → URL Configuration → Redirect URLs**, adicione **`https://SEU_DOMINIO_DO_BACKEND/api/mobile/auth/google/callback`** sem remover os redirects do site web. O backend aceita `MOBILE_AUTH_REDIRECT_URI=condovery://auth/callback` ou a ausência da variável (mesmo valor por padrão). O esquema nativo legado foi mantido para não perder compatibilidade com builds existentes.
+
+O app abre o Google no navegador seguro do aparelho. O retorno usa código de uso único vinculado ao desafio PKCE, sem expor tokens de sessão na URL. Para testar de verdade use **development build ou build distribuída Android/iOS**: Expo Go e a exportação web não conseguem validar o retorno nativo completo.
+
 ## Projeto Expo e development builds
 
 ```bash
