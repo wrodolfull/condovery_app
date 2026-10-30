@@ -131,10 +131,10 @@ test("private images use bearer fetch and deduplicate requests without exposing 
     const url = "https://condovery.example/api/media/771e965c-5e32-40aa-b2f1-11cc208260f8?account=buyer";
     const token = "a".repeat(64);
     const [one, two] = await Promise.all([
-      loadPrivateMedia(url, token), loadPrivateMedia(url, token),
+      loadPrivateMedia(url, token, "https://condovery.example"), loadPrivateMedia(url, token, "https://condovery.example"),
     ]);
     assert.equal(one, two);
-    assert.equal(await loadPrivateMedia(url, token), one);
+    assert.equal(await loadPrivateMedia(url, token, "https://condovery.example"), one);
     assert.equal(calls.length, 1);
     assert.equal(calls[0].url, url);
     assert.equal(
@@ -143,8 +143,15 @@ test("private images use bearer fetch and deduplicate requests without exposing 
     );
     assert.equal(calls[0].options.credentials, "omit");
     assert.equal(calls[0].options.redirect, "error");
-    await assert.rejects(() => loadPrivateMedia("https://external.example/pic.png", token), /inválida/);
-    await assert.rejects(() => loadPrivateMedia(url, "bad"), /inválida/);
+    await assert.rejects(() => loadPrivateMedia("https://external.example/pic.png", token, "https://condovery.example"), /inválida/);
+    // Identical /api/media UUID on an attacker-controlled host must NEVER
+    // receive the bearer token, even when the path looks valid.
+    await assert.rejects(() => loadPrivateMedia(
+      "https://external.example/api/media/771e965c-5e32-40aa-b2f1-11cc208260f8?account=buyer",
+      token, "https://condovery.example"
+    ), /inválida/);
+    assert.equal(calls.length, 1);
+    await assert.rejects(() => loadPrivateMedia(url, "bad", "https://condovery.example"), /inválida/);
     assert.equal(calls.length, 1);
   } finally {
     clearPrivateMediaCache();
