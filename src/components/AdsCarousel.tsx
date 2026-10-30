@@ -100,7 +100,9 @@ export function AdsCarousel({ campaigns }: { campaigns: AdCampaign[] }) {
       </T>
       <View
         onLayout={(event) => {
-          const width = event.nativeEvent.layout.width;
+          // The card border occupies 1px on each side; match the inner
+          // FlatList viewport so every native page snaps at the right edge.
+          const width = Math.max(0, event.nativeEvent.layout.width - 2);
           if (width > 0 && Math.abs(cardWidth - width) > 1) setCardWidth(width);
         }}
         style={{
