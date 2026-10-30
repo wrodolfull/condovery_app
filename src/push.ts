@@ -24,7 +24,7 @@ const idValid = (id: unknown): id is string =>
 export function usePush(listen = true) {
   const { viewer, api } = useAuth();
   const register = useCallback(
-    (ask = false, tokenChanged = false) => gateFor(api).run(async () => {
+    (ask = false) => gateFor(api).run(async () => {
       if (!compatible()) {
         if (ask)
           throw new Error(
@@ -77,7 +77,7 @@ export function usePush(listen = true) {
         platform: Platform.OS,
         project_id: projectId,
       });
-    }, ask || tokenChanged),
+    }, ask),
     [api],
   );
   useEffect(() => {
@@ -105,7 +105,9 @@ export function usePush(listen = true) {
         const sub = N.addNotificationResponseReceivedListener(handle);
         cleanup.push(() => sub.remove());
         const rotated = N.addPushTokenListener(() => {
-          void register(false, true).catch(() => {});
+          // Native token changes may fire repeatedly while Expo refreshes its token.
+          // Use the same coalescing/cooldown as foreground registration.
+          void register().catch(() => {});
         });
         cleanup.push(() => rotated.remove());
         handle(N.getLastNotificationResponse());
