@@ -10,7 +10,8 @@ import React, {
 import * as Crypto from "expo-crypto";
 import * as WebBrowser from "expo-web-browser";
 import Constants from "expo-constants";
-import { ApiClient, backendOrigin } from "./api";
+import { ApiClient, ApiError, backendOrigin } from "./api";
+import {expirationBelongsToCurrentLogin} from "./domain/session-expiry";
 import { secure } from "./storage";
 import type { Viewer } from "./types";
 type Signup = { signup_token: string; email: string; name: string };
@@ -40,7 +41,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [connectionError, setConnectionError] = useState(""),
     [googleSignup, setGoogleSignup] = useState<Signup | null>(null);
   const exchange = useRef<Promise<void> | null>(null);
+  const activeToken=useRef<string|null>(token);
   const clear = useCallback(async () => {
+    activeToken.current=null;
     setToken(null);
     setViewer(null);
     setGoogleSignup(null);
@@ -48,21 +51,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
   const api = useMemo(() => new ApiClient(origin, token), [token]);
   useEffect(() => {
+    activeToken.current=token;
     api.setExpirationHandler(() => {
-      void clear();
+      if(expirationBelongsToCurrentLogin(token,activeToken.current))void clear();
     });
     return () => api.setExpirationHandler(() => {});
-  }, [api, clear]);
+  }, [api, clear, token]);
   const accept = async (t: string) => {
     if (!/^[a-f0-9]{64}$/.test(t))
       throw new Error("Resposta de sessão inválida.");
     const client = new ApiClient(origin, t);
     const r = await client.request<{ viewer: Viewer | null }>("me");
-    if (!r.viewer || r.viewer.status !== "approved") {
+    if (!r.viewer) {
+      await secure.remove("session");
+      throw new ApiError("Sua sessão expirou. Entre novamente.",401);
+    }
+    if (r.viewer.status !== "approved") {
       await secure.remove("session");
       throw new Error("Conta indisponível.");
     }
     await secure.set("session", t);
+    activeToken.current=t;
     setToken(t);
     setViewer(r.viewer);
     setConnectionError("");
@@ -76,10 +85,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!active) return;
         if (t) await accept(t);
       } catch (e) {
-        if (active)
-          setConnectionError(
+        if (active) {
+          // A revoked token should not survive in SecureStore, but a network
+          // interruption must not revoke a still-valid persisted session.
+          if(e instanceof ApiError&&e.status===401){
+            await clear();
+            setConnectionError("Sua sessão expirou. Entre novamente.");
+          }else setConnectionError(
             e instanceof Error ? e.message : "Não foi possível conectar.",
           );
+        }
       } finally {
         if (active) setLoading(false);
       }
