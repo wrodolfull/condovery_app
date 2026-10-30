@@ -184,7 +184,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         connectionError,
         googleSignup,
-        cancelGoogleSignup: () => setGoogleSignup(null),
+        cancelGoogleSignup: () => {
+          completedGoogle.current = null;
+          setGoogleSignup(null);
+        },
         refresh,
         completeGoogle,
         login: async (email, password) => {
