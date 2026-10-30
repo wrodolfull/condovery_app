@@ -1,6 +1,7 @@
 import { quoteChanged } from "../domain/quote";
+import {canDiscardCheckoutAttempt,shouldCheckShopAvailability} from "../domain/checkout-recovery";
 import { dateForApi, formatPreferredDate } from "../domain/date";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { FlatList, Pressable, View, useWindowDimensions } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { randomUUID } from "expo-crypto";
@@ -43,7 +44,8 @@ export function Checkout() {
   // Cart data may have been saved before the seller closed their store.
   const liveShop = useResource<{shop: typeof shop;products:unknown[]}>(shop ? "shops/" + shop.id : null);
   const shopClosed = shop?.is_open===false || liveShop.data?.shop?.is_open===false;
-  const blocked = !!shop && (shopClosed || liveShop.loading || !!liveShop.error);
+  // Retrying an uncertain POST is allowed even if the store has since closed.
+  const blocked = !!shop && !cart.pending && (shopClosed || liveShop.loading || !!liveShop.error);
   const [fulfillment, setFulfillment] = useState<"delivery" | "pickup">(
       shop?.delivery_enabled ? "delivery" : "pickup",
     ),
@@ -58,6 +60,7 @@ export function Checkout() {
       quote: Quote;
       fingerprint: string;
     } | null>(null);
+  const checkoutInFlight = useRef(false);
   const actual =
     shop?.delivery_enabled === false
       ? "pickup"
@@ -92,18 +95,23 @@ export function Checkout() {
       activeQuote = revised.quote;
   } catch {}
   const finish = async () => {
+    if(checkoutInFlight.current)return;
+    checkoutInFlight.current=true;
     market.lockCheckout(true);
     setBusy(true);
     setError("");
     try {
       if(!shop)throw new Error("Carrinho indisponível.");
-      // Always recheck the current store state before resuming or sending.
-      const latest = await api.request<{shop:{is_open:boolean}}>("shops/"+shop.id);
-      if(!latest.shop.is_open){
-        await liveShop.reload().catch(()=>{});
-        throw new Error("Loja fechada. Não é possível realizar pedidos agora.");
-      }
+      // Resolve a pending POST directly: its transaction may have committed
+      // before the response was lost. The server recognizes client_order_key.
       let body = cart.pending?.payload;
+      if(shouldCheckShopAvailability(cart.pending)){
+        const latest = await api.request<{shop:{is_open:boolean}}>("shops/"+shop.id);
+        if(!latest.shop.is_open){
+          await liveShop.reload().catch(()=>{});
+          throw new Error("Loja fechada. Não é possível realizar pedidos agora.");
+        }
+      }
       if (!body) {
         if (!chosen) throw new Error("Escolha uma forma de pagamento.");
         const draft = payload();
@@ -139,7 +147,7 @@ export function Checkout() {
           client_order_key: randomUUID(),
         };
       }
-      await market.pending({ payload: body });
+      if(!cart.pending)await market.pending({ payload: body });
       const result = await api.request<{
         order: { id: string };
         whatsapp_url: string;
@@ -158,12 +166,13 @@ export function Checkout() {
         ),
       );
     } catch (e) {
-      if (e instanceof ApiError && e.status < 500) {
+      if (e instanceof ApiError && canDiscardCheckoutAttempt(e.status)) {
         await market.pending(null).catch(() => {});
         if (e.status === 409) setRevised(null);
       }
       setError((e as Error).message);
     } finally {
+      checkoutInFlight.current=false;
       market.lockCheckout(false);
       setBusy(false);
     }
@@ -201,10 +210,11 @@ export function Checkout() {
       </Card>}
       {cart.pending && (
         <Card>
-          <T bold>Uma tentativa de pedido está em andamento.</T>
+          <T bold>O resultado do envio anterior ainda não foi confirmado.</T>
           <T>
-            Retome a mesma tentativa para conferir o resultado sem criar outro
-            pedido.
+            Use Retomar envio do pedido para resolver a mesma tentativa sem
+            criar outra compra. O pedido anterior pode ter sido registrado,
+            mesmo se a loja fechou depois do envio.
           </T>
           <Button
             title="Ver meus pedidos"
