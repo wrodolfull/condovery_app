@@ -374,22 +374,23 @@ export function Picture({
   const source = api.image(path, viewer?.id ?? "");
   const sourceUri = source?.uri ?? "";
   const token = source?.headers.Authorization?.replace(/^Bearer /, "") ?? "";
+  const mediaKey = sourceUri + "|" + token;
   const [resolved, setResolved] = useState<{ key: string; uri: string | null } | null>(null);
   const [failedUri, setFailedUri] = useState<string | null>(null);
   useEffect(() => {
     if (Platform.OS === "web" || !sourceUri || !token) return;
     let mounted = true;
-    void loadPrivateMedia(sourceUri, token).then(
-      (uri) => { if (mounted) setResolved({ key: sourceUri, uri }); },
-      () => { if (mounted) setResolved({ key: sourceUri, uri: null }); },
+    void loadPrivateMedia(sourceUri, token, api.origin).then(
+      (uri) => { if (mounted) setResolved({ key: mediaKey, uri }); },
+      () => { if (mounted) setResolved({ key: mediaKey, uri: null }); },
     );
     return () => { mounted = false; };
-  }, [sourceUri, token]);
+  }, [sourceUri, token, mediaKey, api.origin]);
   const displayUri = Platform.OS === "web"
     ? sourceUri
-    : resolved?.key === sourceUri ? resolved.uri : null;
+    : resolved?.key === mediaKey ? resolved.uri : null;
   const failed = (Platform.OS === "web" && failedUri === sourceUri) ||
-    (Platform.OS !== "web" && resolved?.key === sourceUri && !resolved.uri);
+    (Platform.OS !== "web" && resolved?.key === mediaKey && !resolved.uri);
   const shape = {
     width: "100%" as const,
     ...(aspectRatio ? { aspectRatio } : { height }),
