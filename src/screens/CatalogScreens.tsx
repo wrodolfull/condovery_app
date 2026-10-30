@@ -77,6 +77,7 @@ export function Home() {
   const ads = useResource<{ campaigns: AdCampaign[] }>("ads");
   const { width } = useWindowDimensions();
   const explore = () => router.navigate("/explorar");
+  const recentProducts = home.data?.recentProducts ?? [];
   const featured = (home.data?.products ?? [])
     .filter((p) => p.promo_price_cents != null || p.is_featured)
     .slice(0, 8);
@@ -249,6 +250,12 @@ export function Home() {
           ) : (
             !ads.loading && <WeeklyOffers />
           )}
+          <Track
+            title="Novidades por aqui"
+            subtitle="Produtos adicionados nos últimos 3 dias"
+            products={recentProducts}
+            showAction={false}
+          />
           <Track title="Produtos em destaque" products={featured} />
         </>
       )}
@@ -378,19 +385,24 @@ function WeeklyOffers() {
     </View>
   );
 }
-function Track({ title, products }: { title: string; products: Product[] }) {
+function Track({ title, products, subtitle, showAction = true }: {
+  title: string; products: Product[]; subtitle?: string; showAction?: boolean;
+}) {
   if (!products.length) return null;
   return (
     <>
       <Section
         title={title}
-        action="Explorar"
-        onAction={() => router.push("/explorar")}
+        action={showAction ? "Explorar" : undefined}
+        onAction={showAction ? () => router.push("/explorar") : undefined}
       />
+      {subtitle && <T style={{ fontSize: 12, color: "#77736B", marginTop: 4, marginBottom: 11 }}>{subtitle}</T>}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 14 }}
+        snapToInterval={showAction ? undefined : 179}
+        decelerationRate={showAction ? "normal" : "fast"}
+        contentContainerStyle={{ gap: 14, paddingBottom: 5 }}
       >
         {products.map((p) => (
           <ProductCard key={p.id} product={p} width={165} />
