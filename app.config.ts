@@ -1,20 +1,31 @@
+
 import type { ExpoConfig } from "expo/config";
-const projectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID;
+
 const config: ExpoConfig = {
   name: "Elevadoor",
-  slug: "condovery-app",
+  slug: "elevadoor",
+  owner: "wrodolfull",
   version: "1.0.0",
+
+  // Manter para compatibilidade com o login atual
   scheme: "condovery",
+
   orientation: "portrait",
   userInterfaceStyle: "light",
   icon: "./assets/icon.png",
-  ios: { bundleIdentifier: "com.wrodolfull.condovery", supportsTablet: true },
+
+  ios: {
+    bundleIdentifier: "pro.elevadoor.app",
+    supportsTablet: true,
+  },
+
   android: {
-    package: "com.wrodolfull.condovery",
+    package: "pro.elevadoor.app",
     ...(process.env.GOOGLE_SERVICES_FILE
       ? { googleServicesFile: process.env.GOOGLE_SERVICES_FILE }
       : {}),
   },
+
   plugins: [
     "expo-router",
     "expo-secure-store",
@@ -22,7 +33,10 @@ const config: ExpoConfig = {
     "expo-font",
     [
       "expo-notifications",
-      { icon: "./assets/notification-icon.png", color: "#FC6741" },
+      {
+        icon: "./assets/notification-icon.png",
+        color: "#FC6741",
+      },
     ],
     [
       "expo-image-picker",
@@ -34,7 +48,17 @@ const config: ExpoConfig = {
       },
     ],
   ],
-  extra: { ...(projectId ? { eas: { projectId } } : {}) },
-  web: { bundler: "metro", output: "single" },
+
+  extra: {
+    eas: {
+      projectId: "6f11fe6b-f0ab-4757-99f0-30396e9c9edc",
+    },
+  },
+
+  web: {
+    bundler: "metro",
+    output: "single",
+  },
 };
+
 export default config;
