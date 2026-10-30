@@ -1,7 +1,7 @@
 import type { ExpoConfig } from "expo/config";
 const projectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID;
 const config: ExpoConfig = {
-  name: "Condovery",
+  name: "Elevadoor",
   slug: "condovery-app",
   version: "1.0.0",
   scheme: "condovery",
