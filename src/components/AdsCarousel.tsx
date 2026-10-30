@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { AppState, Pressable, View, useWindowDimensions } from "react-native";
+import { AppState, FlatList, Pressable, View, useWindowDimensions } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ArrowUpRight, MapPin } from "lucide-react-native";
@@ -21,20 +21,34 @@ export function AdsCarousel({ campaigns }: { campaigns: AdCampaign[] }) {
   const { api } = useAuth();
   const [index, setIndex] = useState(0);
   const target = useRef<View>(null);
-  const touch = useRef<{ x: number; y: number } | null>(null);
+  const list = useRef<FlatList<AdCampaign>>(null);
+  const [cardWidth, setCardWidth] = useState(0);
   const seen = useRef(new Set<string>());
   const dimensions = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const ad = campaigns[index % campaigns.length];
+  // Native paging handles horizontal touch gestures, while the parent Screen
+  // retains vertical scrolling. Both dots and autoplay scroll the same list.
+  const goTo = useCallback(
+    (next: number) => {
+      if (cardWidth <= 0 || campaigns.length < 2) return;
+      list.current?.scrollToOffset({
+        offset: ((next + campaigns.length) % campaigns.length) * cardWidth,
+        animated: true,
+      });
+    },
+    [cardWidth, campaigns.length],
+  );
   useFocusEffect(
     useCallback(() => {
-      if (campaigns.length < 2) return;
+      if (campaigns.length < 2 || cardWidth <= 0) return;
+      // Restart the 8.5-second cycle after each user-controlled page change.
       const timer = setInterval(() => {
         if (AppState.currentState === "active")
-          setIndex((i) => (i + 1) % campaigns.length);
+          goTo(index + 1);
       }, 8500);
       return () => clearInterval(timer);
-    }, [campaigns.length]),
+    }, [campaigns.length, cardWidth, index, goTo]),
   );
   useFocusEffect(
     useCallback(() => {
@@ -85,23 +99,9 @@ export function AdsCarousel({ campaigns }: { campaigns: AdCampaign[] }) {
         Ofertas perto de você
       </T>
       <View
-        onTouchStart={(e) => {
-          touch.current = { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY };
-        }}
-        onTouchEnd={(e) => {
-          const start = touch.current;
-          touch.current = null;
-          if (!start || campaigns.length < 2) return;
-          const dx = e.nativeEvent.pageX - start.x,
-            dy = e.nativeEvent.pageY - start.y;
-          if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy))
-            setIndex(
-              (i) =>
-                (i + (dx < 0 ? 1 : campaigns.length - 1)) % campaigns.length,
-            );
-        }}
-        onTouchCancel={() => {
-          touch.current = null;
+        onLayout={(event) => {
+          const width = event.nativeEvent.layout.width;
+          if (width > 0 && Math.abs(cardWidth - width) > 1) setCardWidth(width);
         }}
         style={{
           overflow: "hidden",
@@ -112,6 +112,31 @@ export function AdsCarousel({ campaigns }: { campaigns: AdCampaign[] }) {
           boxShadow: "0 7px 22px rgba(0,0,0,.06)",
         }}
       >
+        {cardWidth > 0 && (
+          <FlatList
+            ref={list}
+            horizontal
+            pagingEnabled
+            nestedScrollEnabled
+            scrollEnabled={campaigns.length > 1}
+            showsHorizontalScrollIndicator={false}
+            data={campaigns}
+            keyExtractor={(campaign) => campaign.id}
+            getItemLayout={(_, i) => ({
+              length: cardWidth,
+              offset: cardWidth * i,
+              index: i,
+            })}
+            initialNumToRender={2}
+            windowSize={3}
+            scrollEventThrottle={32}
+            onScroll={(event) => {
+              const page = Math.round(event.nativeEvent.contentOffset.x / cardWidth);
+              const next = Math.max(0, Math.min(campaigns.length - 1, page));
+              setIndex((current) => current === next ? current : next);
+            }}
+            renderItem={({ item: ad }) => (
+              <View style={{ width: cardWidth }}>
         <View>
           <Picture
             path={ad.image_url}
@@ -228,6 +253,10 @@ export function AdsCarousel({ campaigns }: { campaigns: AdCampaign[] }) {
             </Pressable>
           </View>
         </View>
+              </View>
+            )}
+          />
+        )}
       </View>
       {campaigns.length > 1 && (
         <View
@@ -246,7 +275,7 @@ export function AdsCarousel({ campaigns }: { campaigns: AdCampaign[] }) {
               accessibilityLabel={`Anúncio ${i + 1}`}
               accessibilityState={{ selected: i === index % campaigns.length }}
               aria-selected={i === index % campaigns.length}
-              onPress={() => setIndex(i)}
+              onPress={() => goTo(i)}
               hitSlop={7}
               style={{ padding: 6 }}
             >
