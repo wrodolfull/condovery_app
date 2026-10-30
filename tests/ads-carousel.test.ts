@@ -20,7 +20,7 @@ test("an ad impression is still counted only when the active slide is visible", 
   assert.match(source, /const ad = campaigns\[index % campaigns\.length\]/);
   assert.match(source, /seen\.current\.has\(ad\.id\)/);
   assert.match(source, /visibleWidth \* visibleHeight >= width \* height \* 0\.5/);
-  assert.match(source, /ads\/.*?\/impression/s);
+  assert.match(source, /"ads\/" \+ ad\.id \+ "\/impression"/);
 });
 
 test("one or zero ads do not enable pagination", () => {
