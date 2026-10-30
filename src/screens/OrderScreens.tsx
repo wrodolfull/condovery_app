@@ -1,4 +1,5 @@
 import { quoteChanged } from "../domain/quote";
+import {canDiscardCheckoutAttempt,shouldCheckShopAvailability} from "../domain/checkout-recovery";
 import { dateForApi, formatPreferredDate } from "../domain/date";
 import React, { useRef, useState } from "react";
 import { FlatList, Pressable, View, useWindowDimensions } from "react-native";
@@ -104,7 +105,7 @@ export function Checkout() {
       // Resolve a pending POST directly: its transaction may have committed
       // before the response was lost. The server recognizes client_order_key.
       let body = cart.pending?.payload;
-      if(!body){
+      if(shouldCheckShopAvailability(cart.pending)){
         const latest = await api.request<{shop:{is_open:boolean}}>("shops/"+shop.id);
         if(!latest.shop.is_open){
           await liveShop.reload().catch(()=>{});
@@ -165,7 +166,7 @@ export function Checkout() {
         ),
       );
     } catch (e) {
-      if (e instanceof ApiError && e.status < 500) {
+      if (e instanceof ApiError && canDiscardCheckoutAttempt(e.status)) {
         await market.pending(null).catch(() => {});
         if (e.status === 409) setRevised(null);
       }
