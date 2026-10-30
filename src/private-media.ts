@@ -36,9 +36,13 @@ export function imageDataUri(buffer: ArrayBuffer, mime: string): string {
   return "data:" + mime + ";base64," + chunks.join("");
 }
 
-export async function loadPrivateMedia(url: string, token: string): Promise<string> {
+export async function loadPrivateMedia(url: string, token: string, trustedOrigin: string): Promise<string> {
+  // The bearer token may be sent ONLY to our configured API origin.
+  // A URL with a valid /api/media/<uuid> path on an external host is not safe.
   const parsed = new URL(url);
-  if (!/^\/api\/media\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(parsed.pathname) ||
+  if (!trustedOrigin || parsed.origin !== trustedOrigin ||
+      !/^\/api\/media\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(parsed.pathname) ||
+      parsed.username || parsed.password || parsed.hash ||
       !/^[0-9a-f]{64}$/.test(token))
     throw new Error("Imagem ou sessão inválida.");
   const key = token + "|" + url;
