@@ -236,7 +236,7 @@ export function Giveaways() {
                       encodeURIComponent(
                         'Olá! Vi seu desapego "' +
                           current.title +
-                          '" no Condovery. Ainda está disponível?',
+                          '" no Elevadoor. Ainda está disponível?',
                       ),
                   ).catch(alertError)
                 }
