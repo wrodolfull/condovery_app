@@ -7,6 +7,14 @@ import { randomUUID } from "expo-crypto";
 import { router } from "expo-router";
 import { useAuth } from "./auth";
 import { secure } from "./storage";
+import { PushRegistrationGate } from "./domain/push-registration";
+// AuthProvider creates a new API client for every new login session.
+const registrationGates = new WeakMap<object, PushRegistrationGate>();
+function gateFor(api: object) {
+  let gate = registrationGates.get(api);
+  if (!gate) { gate = new PushRegistrationGate(); registrationGates.set(api, gate); }
+  return gate;
+}
 const compatible = () =>
   Platform.OS !== "web" &&
   Constants.executionEnvironment !== "storeClient" &&
@@ -16,7 +24,7 @@ const idValid = (id: unknown): id is string =>
 export function usePush(listen = true) {
   const { viewer, api } = useAuth();
   const register = useCallback(
-    async (ask = false) => {
+    (ask = false, tokenChanged = false) => gateFor(api).run(async () => {
       if (!compatible()) {
         if (ask)
           throw new Error(
@@ -69,7 +77,7 @@ export function usePush(listen = true) {
         platform: Platform.OS,
         project_id: projectId,
       });
-    },
+    }, ask || tokenChanged),
     [api],
   );
   useEffect(() => {
@@ -97,7 +105,7 @@ export function usePush(listen = true) {
         const sub = N.addNotificationResponseReceivedListener(handle);
         cleanup.push(() => sub.remove());
         const rotated = N.addPushTokenListener(() => {
-          void register().catch(() => {});
+          void register(false, true).catch(() => {});
         });
         cleanup.push(() => rotated.remove());
         handle(N.getLastNotificationResponse());
