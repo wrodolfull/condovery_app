@@ -457,14 +457,20 @@ test("ads, fairs and inline home search use the same marketplace structure", asy
   expect(impressions).toEqual([]); // offscreen ads are not counted on mount
   const adHeading = page.getByText("Ofertas perto de você", { exact: true });
   await adHeading.scrollIntoViewIfNeeded();
-  await expect(page.getByText("PUBLICIDADE", { exact: true })).toBeVisible();
+  // Native paging keeps adjacent ads mounted; select the active slide,
+  // rather than matching the duplicated label in every rendered slide.
+  await expect(page.getByText("PUBLICIDADE", { exact: true }).first()).toBeVisible();
   await expect(
-    page.getByText("Rua das Flores, 10", { exact: true }),
+    page.getByText("Rua das Flores, 10", { exact: true }).first(),
   ).toBeVisible();
+  const firstDot = page.getByRole("button", { name: "Anúncio 1", exact: true });
+  const secondDot = page.getByRole("button", { name: "Anúncio 2", exact: true });
+  await expect(firstDot).toHaveAttribute("aria-selected", "true");
   await expect
     .poll(() => impressions.filter((p) => p.includes("ad-0")).length)
     .toBe(1);
-  await page.getByRole("button", { name: "Anúncio 2", exact: true }).click();
+  await secondDot.click();
+  await expect(secondDot).toHaveAttribute("aria-selected", "true");
   await expect(
     page.getByText("Oferta da vizinhança 2", { exact: true }),
   ).toBeVisible();
@@ -472,7 +478,8 @@ test("ads, fairs and inline home search use the same marketplace structure", asy
     page.getByText("Ofertas da semana", { exact: true }),
   ).toHaveCount(0);
   await page.screenshot({ path: info.outputPath("advertisement.png") });
-  await page.getByRole("button", { name: "Anúncio 1", exact: true }).click();
+  await firstDot.click();
+  await expect(firstDot).toHaveAttribute("aria-selected", "true");
   await expect(
     page.getByText("Oferta da vizinhança 1", { exact: true }),
   ).toBeVisible();
