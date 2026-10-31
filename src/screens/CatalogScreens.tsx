@@ -453,11 +453,11 @@ function CategoryPicture({
 }) {
   const path = category.id ? getCategoryImagePath(category.name, category.icon) : null;
   const uri = path && origin ? origin.replace(/\/$/, "") + path : null;
-  const [failed, setFailed] = useState(false);
+  // Store the failed URL instead of resetting state inside an effect.
+  // When the category changes, a different URL is attempted automatically.
+  const [failedUri, setFailedUri] = useState<string | null>(null);
 
-  useEffect(() => setFailed(false), [uri]);
-
-  if (!uri || failed) return <CategoryGlyph category={category} color={color} />;
+  if (!uri || failedUri === uri) return <CategoryGlyph category={category} color={color} />;
 
   return (
     <Image
@@ -465,7 +465,7 @@ function CategoryPicture({
       style={{ width: 76, height: 76, borderRadius: 38 }}
       resizeMode="contain"
       accessible={false}
-      onError={() => setFailed(true)}
+      onError={() => setFailedUri(uri)}
     />
   );
 }
