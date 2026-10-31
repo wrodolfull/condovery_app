@@ -755,14 +755,20 @@ export function Section({
 export function Quantity({
   value,
   onChange,
+  min = 0,
+  max = 30,
 }: {
   value: number;
   onChange: (n: number) => void;
+  min?: number;
+  max?: number;
 }) {
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 15 }}>
       <Pressable
         accessibilityLabel="Diminuir quantidade"
+        accessibilityState={{ disabled: value <= min }}
+        disabled={value <= min}
         hitSlop={10}
         onPress={() => onChange(value - 1)}
       >
@@ -771,6 +777,8 @@ export function Quantity({
       <T bold>{value}</T>
       <Pressable
         accessibilityLabel="Aumentar quantidade"
+        accessibilityState={{ disabled: value >= max }}
+        disabled={value >= max}
         hitSlop={10}
         onPress={() => onChange(value + 1)}
       >

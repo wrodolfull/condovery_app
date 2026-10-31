@@ -69,6 +69,7 @@ import { AdsCarousel, type AdCampaign } from "../components/AdsCarousel";
 import { FairHomeTeaser } from "../components/FairCards";
 import { ShopShareSheet } from "../components/ShopShareSheet";
 import { appendUniqueShops } from "../domain/shop-directory";
+import { remainingToAdd } from "../domain/cart-stock";
 import { getCategoryImagePath } from "../domain/category-artwork";
 export function Home() {
   const { viewer } = useAuth();
@@ -1200,6 +1201,9 @@ export function ProductDetail() {
   const p = r.data?.products.find((p) => p.id === id),
     shop = r.data?.shop;
   const market = useMarket();
+  const existingLines=market.cart.shop?.id===shop?.id?market.cart.items:[];
+  const remaining=p?remainingToAdd(p.stock,existingLines,p.id):null;
+  const maximumToAdd=Math.min(30,remaining??30);
   const purchasable = !!p && !!shop && shop.is_open && p.visibility==="available" && p.stock!==0;
   const [qty, setQty] = useState(1),
     [note, setNote] = useState(""),
@@ -1230,7 +1234,13 @@ export function ProductDetail() {
           <T heading style={{ fontSize: 30, lineHeight: 36 }}>
             {p.name}
           </T>
-          <T style={{ color: colors.muted }}>{shop.name}</T>
+          <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 4 }}>
+            <T style={{ color: colors.muted }}>Por</T>
+            <Pressable accessibilityRole="link" accessibilityLabel={"Abrir loja "+shop.name}
+              onPress={() => router.push({ pathname: "/loja/[id]", params: { id: shop.id } })}>
+              <T style={{ color: colors.muted, textDecorationLine: "underline" }}>{shop.name}</T>
+            </Pressable>
+          </View>
           <T>{p.description}</T>
           <T heading style={{ fontSize: 24 }}>
             {money(unitPrice(p) + extra)}
@@ -1288,13 +1298,18 @@ export function ProductDetail() {
           />
           <Quantity
             value={qty}
-            onChange={(n) => setQty(Math.max(1, Math.min(30, n)))}
+            min={1}
+            max={maximumToAdd}
+            onChange={(n) => setQty(Math.max(1, Math.min(Math.max(1,maximumToAdd), n)))}
           />
+          {remaining!==null&&<T style={{fontSize:12,color:colors.muted}}>{remaining===0
+            ?"Você já atingiu o estoque disponível deste produto no carrinho."
+            :"Disponível para adicionar: "+remaining+" unidade(s)."}</T>}
           <Button
             title={
               "Adicionar ao carrinho · " + money((unitPrice(p) + extra) * qty)
             }
-            disabled={!purchasable}
+            disabled={!purchasable||maximumToAdd===0||qty>maximumToAdd}
             onPress={() => {
               void market
                 .add(p, shop, qty, note, choices)

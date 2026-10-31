@@ -231,7 +231,7 @@ export function AdsCarousel({ campaigns }: { campaigns: AdCampaign[] }) {
             </View>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={"Ver oferta de " + ad.merchant_name}
+              accessibilityLabel={"Saiba mais sobre " + ad.merchant_name}
               onPress={() => {
                 void api
                   .request("ads/" + ad.id + "/click", "POST")
@@ -249,7 +249,7 @@ export function AdsCarousel({ campaigns }: { campaigns: AdCampaign[] }) {
               }}
             >
               <T bold style={{ color: "white", fontSize: 13 }}>
-                Ver oferta
+                Saiba mais
               </T>
               <ArrowUpRight size={16} color="white" />
             </Pressable>
