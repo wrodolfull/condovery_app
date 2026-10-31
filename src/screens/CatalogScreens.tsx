@@ -488,7 +488,7 @@ function Categories({
           key={c.id}
           onPress={() =>
             !c.id
-              ? onSelect ? onSelect("") : router.navigate("/explorar")
+              ? onSelect ? onSelect("") : router.push({ pathname: "/explorar", params: { categoria: "", ofertas: "" } })
               : c.name === "Desapego"
                 ? router.push("/desapego")
                 : onSelect
