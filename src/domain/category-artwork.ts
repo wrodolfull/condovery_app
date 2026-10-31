@@ -13,7 +13,8 @@ export function getCategoryImagePath(name: string, icon?: string): string | null
   if (/limpeza/.test(normalized)) return path("limpeza");
   if (/salgado/.test(normalized)) return path("salgados");
   if (/padaria/.test(normalized)) return path("padaria");
-  if (/sobremesa|sorvete/.test(normalized)) return path("doces");
+  if (/sorvete|gelato|ice[ -]?cream/.test(normalized)) return path("sorvetes");
+  if (/sobremesa/.test(normalized)) return path("doces");
   if (/bolo/.test(normalized)) return path("bolos");
   if (/doce|brigadeiro/.test(normalized)) return path("doces");
   if (/pao|paes/.test(normalized)) return path("padaria");
