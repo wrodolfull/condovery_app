@@ -728,15 +728,6 @@ export function Explore() {
               selected={category}
               onSelect={setCategory}
             />
-            {!!category && (
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setCategory("")}
-                style={{ alignSelf: "flex-start", paddingVertical: 7 }}
-              >
-                <T bold style={{ color: "#CF5A3A", fontSize: 12 }}>Limpar filtro</T>
-              </Pressable>
-            )}
             <ErrorBox message={error} />
           </View>
         }
