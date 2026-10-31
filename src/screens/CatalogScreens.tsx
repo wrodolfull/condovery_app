@@ -148,24 +148,8 @@ export function Home() {
       <View style={{ marginBottom: 4 }}>
         <SearchBox value={query} onChangeText={setQuery} />
       </View>
-      <View style={{ gap: 1, marginBottom: 10 }}>
+      <View style={{ marginBottom: 10 }}>
         <Categories categories={home.data?.categories ?? []} />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Explorar todas as categorias"
-          onPress={explore}
-          style={{
-            alignSelf: "flex-end",
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 6,
-            paddingVertical: 8,
-            paddingHorizontal: 2,
-          }}
-        >
-          <T bold style={{ color: "#CF5A3A", fontSize: 12 }}>Explorar tudo</T>
-          <ArrowRight size={15} color="#CF5A3A" />
-        </Pressable>
       </View>
       {!query && (
         <LinearGradient
@@ -499,18 +483,20 @@ function Categories({
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={{ gap: 12 }}
     >
-      {categories.map((c, i) => (
+      {[...categories, { id: "", name: "Tudo", icon: "layout-grid" }].map((c, i) => (
         <Pressable
           key={c.id}
           onPress={() =>
-            c.name === "Desapego"
-              ? router.push("/desapego")
-              : onSelect
-                ? onSelect(c.id)
-                : router.push({
-                    pathname: "/explorar",
-                    params: { categoria: c.id },
-                  })
+            !c.id
+              ? onSelect ? onSelect("") : router.push({ pathname: "/explorar", params: { categoria: "", ofertas: "" } })
+              : c.name === "Desapego"
+                ? router.push("/desapego")
+                : onSelect
+                  ? onSelect(c.id)
+                  : router.push({
+                      pathname: "/explorar",
+                      params: { categoria: c.id },
+                    })
           }
           accessibilityRole="button"
           accessibilityState={{
@@ -742,15 +728,6 @@ export function Explore() {
               selected={category}
               onSelect={setCategory}
             />
-            {!!category && (
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setCategory("")}
-                style={{ alignSelf: "flex-start", paddingVertical: 7 }}
-              >
-                <T bold style={{ color: "#CF5A3A", fontSize: 12 }}>Limpar filtro</T>
-              </Pressable>
-            )}
             <ErrorBox message={error} />
           </View>
         }
