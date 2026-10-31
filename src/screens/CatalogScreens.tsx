@@ -147,6 +147,25 @@ export function Home() {
       <View style={{ marginBottom: 4 }}>
         <SearchBox value={query} onChangeText={setQuery} />
       </View>
+      <View style={{ gap: 1, marginBottom: 10 }}>
+        <Categories categories={home.data?.categories ?? []} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Explorar todas as categorias"
+          onPress={explore}
+          style={{
+            alignSelf: "flex-end",
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            paddingVertical: 8,
+            paddingHorizontal: 2,
+          }}
+        >
+          <T bold style={{ color: "#CF5A3A", fontSize: 12 }}>Explorar tudo</T>
+          <ArrowRight size={15} color="#CF5A3A" />
+        </Pressable>
+      </View>
       {!query && (
         <LinearGradient
           colors={["#F96036", "#FF8550"]}
@@ -234,12 +253,6 @@ export function Home() {
         retry={() => void home.reload().catch(() => {})}
       />
       {home.loading && !home.data && <Loading />}
-      <Section
-        title="Descubra o que tem por aqui"
-        action="Ver categorias"
-        onAction={explore}
-      />
-      <Categories categories={home.data?.categories ?? []} />
       {!query && (
         <>
           <FairHomeTeaser />
@@ -485,7 +498,7 @@ function Categories({
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={{ gap: 12 }}
     >
-      {[{ id: "", name: "Todos", icon: "" }, ...categories].map((c, i) => (
+      {categories.map((c, i) => (
         <Pressable
           key={c.id}
           onPress={() =>
@@ -728,6 +741,15 @@ export function Explore() {
               selected={category}
               onSelect={setCategory}
             />
+            {!!category && (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setCategory("")}
+                style={{ alignSelf: "flex-start", paddingVertical: 7 }}
+              >
+                <T bold style={{ color: "#CF5A3A", fontSize: 12 }}>Limpar filtro</T>
+              </Pressable>
+            )}
             <ErrorBox message={error} />
           </View>
         }
