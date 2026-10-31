@@ -69,6 +69,7 @@ import { AdsCarousel, type AdCampaign } from "../components/AdsCarousel";
 import { FairHomeTeaser } from "../components/FairCards";
 import { ShopShareSheet } from "../components/ShopShareSheet";
 import { appendUniqueShops } from "../domain/shop-directory";
+import { getCategoryImagePath } from "../domain/category-artwork";
 export function Home() {
   const { viewer } = useAuth();
   const { home } = useMarket();
@@ -438,6 +439,36 @@ function CategoryGlyph({
   const Icon = category.id ? (icons[category.icon] ?? ShoppingBag) : LayoutGrid;
   return <Icon size={25} strokeWidth={1.8} color={color} />;
 }
+/** Reuse public category art hosted on the same origin as the web app.
+ * A broken/missing file never leaves a blank tile: the original Lucide glyph appears.
+ */
+function CategoryPicture({
+  category,
+  color,
+  origin,
+}: {
+  category: Category;
+  color: string;
+  origin: string;
+}) {
+  const path = category.id ? getCategoryImagePath(category.name, category.icon) : null;
+  const uri = path && origin ? origin.replace(/\/$/, "") + path : null;
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => setFailed(false), [uri]);
+
+  if (!uri || failed) return <CategoryGlyph category={category} color={color} />;
+
+  return (
+    <Image
+      source={{ uri, cache: "force-cache" }}
+      style={{ width: 76, height: 76, borderRadius: 38 }}
+      resizeMode="contain"
+      accessible={false}
+      onError={() => setFailed(true)}
+    />
+  );
+}
 function Categories({
   categories,
   selected,
@@ -447,6 +478,7 @@ function Categories({
   selected?: string;
   onSelect?: (id: string) => void;
 }) {
+  const { api } = useAuth();
   return (
     <ScrollView
       horizontal
@@ -484,10 +516,12 @@ function Categories({
               ],
               borderWidth: c.id === selected ? 2 : 0,
               borderColor: colors.orange,
+              overflow: "hidden",
             }}
           >
-            <CategoryGlyph
+            <CategoryPicture
               category={c}
+              origin={api.origin}
               color={["#DE6D50", "#628755", "#7974BC", "#C59114"][i % 4]}
             />
           </View>
