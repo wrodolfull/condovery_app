@@ -52,17 +52,17 @@ export function FairHomeTeaser() {
           style={{
             flexDirection: "row",
             alignItems: "center",
-            gap: 6,
-            borderWidth: 1,
-            borderColor: "#E8E3D9",
-            borderRadius: 12,
-            padding: 10,
+            gap: 7,
+            backgroundColor: "#111111",
+            borderRadius: 13,
+            paddingVertical: 12,
+            paddingHorizontal: 17,
           }}
         >
-          <T bold style={{ fontSize: 12 }}>
+          <T bold style={{ fontSize: 13, color: "white" }}>
             Ver feiras
           </T>
-          <ArrowRight size={16} color="#251F18" />
+          <ArrowRight size={16} color="white" />
         </Pressable>
       </View>
       {data.fairs.slice(0, 3).map((fair) => (

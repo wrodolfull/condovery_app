@@ -69,6 +69,8 @@ import { AdsCarousel, type AdCampaign } from "../components/AdsCarousel";
 import { FairHomeTeaser } from "../components/FairCards";
 import { ShopShareSheet } from "../components/ShopShareSheet";
 import { appendUniqueShops } from "../domain/shop-directory";
+import { remainingToAdd } from "../domain/cart-stock";
+import { getCategoryImagePath } from "../domain/category-artwork";
 export function Home() {
   const { viewer } = useAuth();
   const { home } = useMarket();
@@ -145,6 +147,25 @@ export function Home() {
       </View>
       <View style={{ marginBottom: 4 }}>
         <SearchBox value={query} onChangeText={setQuery} />
+      </View>
+      <View style={{ gap: 1, marginBottom: 10 }}>
+        <Categories categories={home.data?.categories ?? []} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Explorar todas as categorias"
+          onPress={explore}
+          style={{
+            alignSelf: "flex-end",
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            paddingVertical: 8,
+            paddingHorizontal: 2,
+          }}
+        >
+          <T bold style={{ color: "#CF5A3A", fontSize: 12 }}>Explorar tudo</T>
+          <ArrowRight size={15} color="#CF5A3A" />
+        </Pressable>
       </View>
       {!query && (
         <LinearGradient
@@ -233,12 +254,6 @@ export function Home() {
         retry={() => void home.reload().catch(() => {})}
       />
       {home.loading && !home.data && <Loading />}
-      <Section
-        title="Descubra o que tem por aqui"
-        action="Ver categorias"
-        onAction={explore}
-      />
-      <Categories categories={home.data?.categories ?? []} />
       {!query && (
         <>
           <FairHomeTeaser />
@@ -438,6 +453,36 @@ function CategoryGlyph({
   const Icon = category.id ? (icons[category.icon] ?? ShoppingBag) : LayoutGrid;
   return <Icon size={25} strokeWidth={1.8} color={color} />;
 }
+/** Reuse public category art hosted on the same origin as the web app.
+ * A broken/missing file never leaves a blank tile: the original Lucide glyph appears.
+ */
+function CategoryPicture({
+  category,
+  color,
+  origin,
+}: {
+  category: Category;
+  color: string;
+  origin: string;
+}) {
+  const path = category.id ? getCategoryImagePath(category.name, category.icon) : null;
+  const uri = path && origin ? origin.replace(/\/$/, "") + path : null;
+  // Store the failed URL instead of resetting state inside an effect.
+  // When the category changes, a different URL is attempted automatically.
+  const [failedUri, setFailedUri] = useState<string | null>(null);
+
+  if (!uri || failedUri === uri) return <CategoryGlyph category={category} color={color} />;
+
+  return (
+    <Image
+      source={{ uri, cache: "force-cache" }}
+      style={{ width: 76, height: 76, borderRadius: 38 }}
+      resizeMode="contain"
+      accessible={false}
+      onError={() => setFailedUri(uri)}
+    />
+  );
+}
 function Categories({
   categories,
   selected,
@@ -447,13 +492,14 @@ function Categories({
   selected?: string;
   onSelect?: (id: string) => void;
 }) {
+  const { api } = useAuth();
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={{ gap: 12 }}
     >
-      {[{ id: "", name: "Todos", icon: "" }, ...categories].map((c, i) => (
+      {categories.map((c, i) => (
         <Pressable
           key={c.id}
           onPress={() =>
@@ -484,10 +530,12 @@ function Categories({
               ],
               borderWidth: c.id === selected ? 2 : 0,
               borderColor: colors.orange,
+              overflow: "hidden",
             }}
           >
-            <CategoryGlyph
+            <CategoryPicture
               category={c}
+              origin={api.origin}
               color={["#DE6D50", "#628755", "#7974BC", "#C59114"][i % 4]}
             />
           </View>
@@ -694,6 +742,15 @@ export function Explore() {
               selected={category}
               onSelect={setCategory}
             />
+            {!!category && (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setCategory("")}
+                style={{ alignSelf: "flex-start", paddingVertical: 7 }}
+              >
+                <T bold style={{ color: "#CF5A3A", fontSize: 12 }}>Limpar filtro</T>
+              </Pressable>
+            )}
             <ErrorBox message={error} />
           </View>
         }
@@ -1144,6 +1201,9 @@ export function ProductDetail() {
   const p = r.data?.products.find((p) => p.id === id),
     shop = r.data?.shop;
   const market = useMarket();
+  const existingLines=market.cart.shop?.id===shop?.id?market.cart.items:[];
+  const remaining=p?remainingToAdd(p.stock,existingLines,p.id):null;
+  const maximumToAdd=Math.min(30,remaining??30);
   const purchasable = !!p && !!shop && shop.is_open && p.visibility==="available" && p.stock!==0;
   const [qty, setQty] = useState(1),
     [note, setNote] = useState(""),
@@ -1174,7 +1234,13 @@ export function ProductDetail() {
           <T heading style={{ fontSize: 30, lineHeight: 36 }}>
             {p.name}
           </T>
-          <T style={{ color: colors.muted }}>{shop.name}</T>
+          <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 4 }}>
+            <T style={{ color: colors.muted }}>Por</T>
+            <Pressable accessibilityRole="link" accessibilityLabel={"Abrir loja "+shop.name}
+              onPress={() => router.push({ pathname: "/loja/[id]", params: { id: shop.id } })}>
+              <T style={{ color: colors.muted, textDecorationLine: "underline" }}>{shop.name}</T>
+            </Pressable>
+          </View>
           <T>{p.description}</T>
           <T heading style={{ fontSize: 24 }}>
             {money(unitPrice(p) + extra)}
@@ -1232,13 +1298,18 @@ export function ProductDetail() {
           />
           <Quantity
             value={qty}
-            onChange={(n) => setQty(Math.max(1, Math.min(30, n)))}
+            min={1}
+            max={maximumToAdd}
+            onChange={(n) => setQty(Math.max(1, Math.min(Math.max(1,maximumToAdd), n)))}
           />
+          {remaining!==null&&<T style={{fontSize:12,color:colors.muted}}>{remaining===0
+            ?"Você já atingiu o estoque disponível deste produto no carrinho."
+            :"Disponível para adicionar: "+remaining+" unidade(s)."}</T>}
           <Button
             title={
               "Adicionar ao carrinho · " + money((unitPrice(p) + extra) * qty)
             }
-            disabled={!purchasable}
+            disabled={!purchasable||maximumToAdd===0||qty>maximumToAdd}
             onPress={() => {
               void market
                 .add(p, shop, qty, note, choices)

@@ -32,7 +32,8 @@ import {
   type PaymentMethod,
 } from "../domain/payment-methods";
 import { openWhatsApp } from "../external";
-import { statusLabels, type Order, type Quote } from "../types";
+import { statusLabels, type Order, type Quote, type Product } from "../types";
+import {maxLineQuantity} from "../domain/cart-stock";
 import { useFocusedOrderRefresh } from "../useFocusedOrderRefresh";
 import { orderNeedsLiveRefresh } from "../domain/order-refresh";
 import { orderHistoryPath, type OrdersPage } from "../domain/order-pagination";
@@ -42,8 +43,12 @@ export function Checkout() {
   const { cart } = market;
   const shop = cart.shop;
   // Cart data may have been saved before the seller closed their store.
-  const liveShop = useResource<{shop: typeof shop;products:unknown[]}>(shop ? "shops/" + shop.id : null);
+  const liveShop = useResource<{shop: typeof shop;products:Product[]}>(shop ? "shops/" + shop.id : null);
   const shopClosed = shop?.is_open===false || liveShop.data?.shop?.is_open===false;
+  const stockFor=(product:Product)=>{
+    const fresh=liveShop.data?.products.find(p=>p.id===product.id);
+    return fresh?fresh.stock:product.stock;
+  };
   // Retrying an uncertain POST is allowed even if the store has since closed.
   const blocked = !!shop && !cart.pending && (shopClosed || liveShop.loading || !!liveShop.error);
   const [fulfillment, setFulfillment] = useState<"delivery" | "pickup">(
@@ -238,6 +243,7 @@ export function Checkout() {
           {!cart.pending && (
             <Quantity
               value={i.quantity}
+              max={maxLineQuantity(stockFor(i.product),cart.items,i.product.id,index)}
               onChange={(n) => {
                 if (busy) return;
                 try {

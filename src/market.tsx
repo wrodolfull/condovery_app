@@ -17,6 +17,7 @@ import {
   type Selection,
 } from "./domain/orders";
 import type { CartItem, HomeData, Product, Shop } from "./types";
+import {unitsInCart,maxLineQuantity} from "./domain/cart-stock";
 export type PendingOrder = { payload: Record<string, unknown> };
 type Cart = {
   shop: Shop | null;
@@ -146,6 +147,11 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
             if (!yes) return false;
           }
           const items = cart.shop?.id === shop.id ? cart.items : [];
+          if(!Number.isInteger(qty)||qty<1||qty>30)
+            throw new Error("Escolha entre 1 e 30 unidades por item.");
+          const totalOfProduct=unitsInCart(items,product.id);
+          if(product.stock!==null&&totalOfProduct+qty>product.stock)
+            throw new Error("Estoque disponível para adicionar: "+Math.max(0,product.stock-totalOfProduct)+" unidade(s).");
           const matching = items.find(
             (i) =>
               i.product.id === product.id &&
@@ -179,13 +185,14 @@ export function MarketProvider({ children }: { children: React.ReactNode }) {
           ensure();
           setCart((c) => ({
             ...c,
-            items: c.items.flatMap((i) =>
-              i.key === key
-                ? qty > 0
-                  ? [{ ...i, quantity: Math.min(30, qty) }]
-                  : []
-                : [i],
-            ),
+            items: c.items.flatMap((i,index) => {
+              if(i.key!==key)return [i];
+              if(qty<=0)return [];
+              const upper=maxLineQuantity(i.product.stock,c.items,i.product.id,index);
+              // Preserve already stored quantities if stock changed since the item was added;
+              // do not allow further increases beyond the currently known limit.
+              return [{...i,quantity:Math.max(1,Math.min(qty,Math.max(i.quantity,upper)))}];
+            }),
           }));
         },
         clear: () => setCart(empty),
