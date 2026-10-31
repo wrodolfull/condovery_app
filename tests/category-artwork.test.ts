@@ -7,6 +7,9 @@ test("category names map to hosted WebP files regardless of accent and case", ()
   assert.equal(getCategoryImagePath("Pães e salgados", "sandwich"), "/categories/salgados.webp");
   assert.equal(getCategoryImagePath("Refeições"), "/categories/refeicoes.webp");
   assert.equal(getCategoryImagePath("Açaí"), "/categories/acai.webp");
+  assert.equal(getCategoryImagePath("Sorvetes"), "/categories/sorvetes.webp");
+  assert.equal(getCategoryImagePath("Sobremesas e sorvetes", "ice-cream-cone"), "/categories/sorvetes.webp");
+  assert.equal(getCategoryImagePath("Sobremesas"), "/categories/doces.webp");
   assert.equal(getCategoryImagePath("Pizza"), "/categories/pizzas.webp");
   assert.equal(getCategoryImagePath("Mercadinho"), "/categories/mercado.webp");
   assert.equal(getCategoryImagePath("Casa e decoração"), "/categories/casa-decoracao.webp");
