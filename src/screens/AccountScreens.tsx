@@ -52,16 +52,16 @@ export function Account() {
   };
   const shortcuts: AccountLink[] = [
     {
-      label: "Feiras do condomínio",
-      description: "Descubra as feiras da vizinhança",
-      icon: <Gift size={22} color={colors.ink} />,
-      onPress: () => router.push("/feiras"),
-    },
-    {
       label: "Minha loja / Quero vender",
       description: "Gerencie sua loja e seus pedidos no aplicativo",
       icon: <Store size={22} color={colors.ink} />,
       onPress: webPanel,
+    },
+    {
+      label: "Feiras do condomínio",
+      description: "Descubra as feiras da vizinhança",
+      icon: <Gift size={22} color={colors.ink} />,
+      onPress: () => router.push("/feiras"),
     },
     {
       label: "Meus pedidos",
