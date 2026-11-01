@@ -20,5 +20,6 @@ test("foreground push and opening notices refresh unread count",()=>{
   assert.match(screen,/push\/status/);
   assert.match(screen,/useFocusEffect/);
   assert.match(screen,/api\.request\("push\/inbox\/" \+ id, "PATCH"\)/);
-  assert.match(screen,/title="Ver pedidos da minha loja"/);
+  assert.match(screen,/Ver pedidos da minha loja/);
+  assert.match(screen,/useOpenNotification/);
 });
