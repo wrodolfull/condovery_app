@@ -96,6 +96,11 @@ export function selectedOptions(groups:OptionGroup[],selections:Selection={}):Ch
 export function extrasTotal(options:ChosenOption[]):number{
   return options.reduce((sum,opt)=>sum+opt.price_cents*(opt.quantity??1),0);
 }
+/** Calculate a live preview even while required groups are unfinished. */
+export function previewExtrasTotal(groups:OptionGroup[],selections:Selection):number{
+  const preview=groups.map(group=>({...group,required:false,min_select:0}));
+  return extrasTotal(selectedOptions(preview,selections));
+}
 // Arrival instructions follow the order into the vendor WhatsApp message.
 export const arrivalInstructionOptions = [
   "Bater na porta",
@@ -180,8 +185,9 @@ export function orderMessage(order: {
                 "  - " +
                 o.group +
                 ": " +
+                (o.quantity && o.quantity > 1 ? o.quantity + "x " : "") +
                 o.name +
-                (o.price_cents ? " (+" + BRL(o.price_cents) + ")" : ""),
+                (o.price_cents ? " (+" + BRL(o.price_cents * (o.quantity ?? 1)) + ")" : ""),
             ),
           ]
         : []),
