@@ -127,7 +127,8 @@ export function usePush(listen = true) {
         });
         cleanup.push(() => rotated.remove());
         handle(N.getLastNotificationResponse());
-        await N.clearLastNotificationResponseAsync();
+        // A stale response must not block permission onboarding.
+        await N.clearLastNotificationResponseAsync().catch(() => {});
         // Only the first authenticated registration may request permission
         // automatically. Foreground refreshes remain silent.
         if (alive) await register(false, true);
@@ -142,5 +143,16 @@ export function usePush(listen = true) {
       cleanup.forEach((fn) => fn());
     };
   }, [viewer, api, register, listen]);
-  return { activate: () => register(true) };
+  return {
+    activate: async () => {
+      await register(true);
+      // A manual button press should never report success if an automatic
+      // registration was still in progress and the permission was declined.
+      if (compatible()) {
+        const N = await import("expo-notifications");
+        if (!(await N.getPermissionsAsync()).granted)
+          throw new Error("Permita as notificações nas configurações do aparelho.");
+      }
+    },
+  };
 }
