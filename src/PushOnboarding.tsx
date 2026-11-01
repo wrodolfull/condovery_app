@@ -8,6 +8,7 @@ import { usePush } from "./push";
 import { secure } from "./storage";
 import { Button, T } from "./ui";
 import { colors } from "./theme";
+import { shouldShowPushOnboarding } from "./domain/push-permission";
 
 const STORAGE_KEY = "push_onboarding_choice_v2";
 
@@ -31,7 +32,8 @@ export function PushOnboarding() {
       if (await secure.get(STORAGE_KEY) === "1" || !active) return;
       const N = await import("expo-notifications");
       const permission = await N.getPermissionsAsync();
-      if (active && !permission.granted) {
+      if (active && shouldShowPushOnboarding(Platform.OS,Device.isDevice,
+        permission.granted,false)) {
         setNeedsSettings(!permission.canAskAgain);
         setVisible(true);
       }
