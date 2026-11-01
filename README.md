@@ -70,6 +70,14 @@ O perfil `simulator` gera uma build para o simulador iOS. O perfil `preview` ofe
 
 Identificadores configurados: `com.wrodolfull.condovery` em Android e iOS; esquema de retorno `condovery://auth/callback`.
 
+## Notificações nativas e primeiro acesso
+
+O Elevadoor oferece uma caixa de avisos in-app com contador de não lidas. Após o primeiro login em uma build física, se as notificações ainda não estiverem autorizadas, aparece uma **janela explicativa com Ativar notificações e Agora não**. O sistema Android/iOS só exibe seu pedido de permissão após o toque em Ativar; o estado de escolha fica guardado por instalação. Se a autorização já foi recusada definitivamente, existe um atalho para as configurações do aparelho. A tentativa silenciosa antiga não bloqueia esse convite.
+
+O sino e o push remoto agora usam o **mesmo direcionamento nativo**: vendedor recebe novo pedido/lembrete → Minha loja → Pedidos, avaliação nova → Minha loja → Avaliações; comprador recebe mudança de status e atualização de avaliação → Detalhe do pedido. Não há tela intermediária ou abertura do navegador. Pedidos antigos podem ser abertos diretamente com ID autorizado pelo backend.
+
+O backend precisa ter a migração 044 e a PR correspondente publicados antes de instalar o novo APK. Lembretes de conclusão são gerados por `push:dispatch` para pedidos confirmados há mais de 2 horas que seguem abertos, respeitando a data de entrega informada, uma vez por pedido. Para receber o banner/push externo, configure credenciais Expo/FCM e o worker no servidor. O contador do header continua operando mesmo sem push remoto.
+
 ## Ativar push
 
 1. Configure Firebase/FCM v1 para o aplicativo Android. Forneça `google-services.json` como arquivo privado no EAS e aponte `GOOGLE_SERVICES_FILE` para ele. Não o envie ao Git.
@@ -79,7 +87,7 @@ Identificadores configurados: `com.wrodolfull.condovery` em Android e iOS; esque
 5. Gere e instale um **novo APK Android** (development build ou preview) em um aparelho físico. Após o primeiro login/cadastro aprovado, o Android solicita a permissão de notificações caso ela ainda esteja pendente. Quem autorizar terá o dispositivo registrado automaticamente.
 6. Se a pessoa já recusou a permissão ou a desativou nas configurações do Android, o aplicativo **não repete automaticamente** a solicitação. Ela pode habilitar a permissão nas configurações do aparelho e usar **Conta → Preferências de notificações → Ativar notificações neste aparelho** para registrar o dispositivo.
 
-O app solicita a permissão apenas na primeira utilização autenticada elegível no Android; nunca na tela de login. O diálogo depende da versão do Android e das decisões anteriores do usuário. A solicitação ocorre **depois de criar os canais de notificações**; no Android 13+ é utilizada a permissão `POST_NOTIFICATIONS`. O estado de tentativa fica guardado por instalação. Dispositivos já autorizados são sincronizados ao entrar e ao voltar ao primeiro plano. O backend deriva o destinatário e condomínio da sessão; nenhum remetente escolhe um token arbitrário.
+O novo app apresenta uma janela explicativa no primeiro login e abre a solicitação nativa quando o usuário toca em Ativar. O diálogo depende da versão do Android e de autorizações ou recusas anteriores. A solicitação ocorre **depois de criar os canais de notificações**; no Android 13+ é utilizada a permissão `POST_NOTIFICATIONS`. O estado de tentativa fica guardado por instalação. Dispositivos já autorizados são sincronizados ao entrar e ao voltar ao primeiro plano. O backend deriva o destinatário e condomínio da sessão; nenhum remetente escolhe um token arbitrário.
 
 **Importante:** autorizar a permissão não garante o recebimento de push: FCM, o projeto Expo, `PUSH_ENABLED=true` e o worker de envio precisam estar configurados. A CI não substitui um teste no APK real.
 
