@@ -9,7 +9,7 @@ import { money, colors } from "../theme";
 import { uploadPicture } from "../upload";
 import { allowedPaymentMethods, PAYMENT_LABELS, type PaymentMethod } from "../domain/payment-methods";
 import type { Product, Category, Order } from "../types";
-import type { OptionGroup } from "../domain/orders";
+import {optionGroupsSchema, selectionBounds, type OptionGroup} from "../domain/orders";
 import { sellerItemDetails, sellerOrderDetails } from "../domain/seller-orders";
 import { formatBRLInput, parseBRLInput } from "../domain/money-input";
 import {sellerDraftScope,parseSellerDraft,type ShopDraft} from "../domain/shop-draft";
@@ -284,6 +284,8 @@ export default function SellerPanel() {
         return {...option,price_cents:amount};
       }),
     }));
+    const valid=optionGroupsSchema.safeParse(option_groups);
+    if(!valid.success)throw new Error("Confira as opções: os limites mínimo e máximo precisam ser válidos e o mínimo não pode superar o máximo.");
     const data={name:p.name,description:p.description,category_id:p.category_id,
       price_cents:price,promo_price_cents:promo,
       stock:p.stock.trim()?Number(p.stock):null,image_url:p.image_url||null,
@@ -398,12 +400,26 @@ export default function SellerPanel() {
             onChangeText={v=>setProductForm(p=>p?{...p,option_groups:p.option_groups.map(x=>x.id===g.id?{...x,name:v}:x)}:p)}/>
           <View style={{flexDirection:"row",justifyContent:"space-between",alignItems:"center"}}>
             <T>Escolha obrigatória</T>
-            <Switch value={g.required} onValueChange={v=>setProductForm(p=>p?{...p,option_groups:p.option_groups.map(x=>x.id===g.id?{...x,required:v}:x)}:p)}/>
+            <Switch value={g.required} onValueChange={v=>setProductForm(p=>p?{...p,option_groups:p.option_groups.map(x=>x.id===g.id?{...x,required:v,min_select:v?Math.max(1,x.min_select??0):0}:x)}:p)}/>
           </View>
           <View style={{flexDirection:"row",justifyContent:"space-between",alignItems:"center"}}>
             <T>Permitir várias escolhas</T>
-            <Switch value={g.multiple} onValueChange={v=>setProductForm(p=>p?{...p,option_groups:p.option_groups.map(x=>x.id===g.id?{...x,multiple:v}:x)}:p)}/>
+            <Switch value={g.multiple} onValueChange={v=>setProductForm(p=>p?{...p,option_groups:p.option_groups.map(x=>x.id===g.id?{...x,multiple:v,max_select:v?undefined:1,allow_quantity:v?x.allow_quantity:false,min_select:v?x.min_select:Math.min(1,x.min_select??(x.required?1:0))}:x)}:p)}/>
           </View>
+          {g.multiple&&<>
+            <View style={{flexDirection:"row",justifyContent:"space-between",alignItems:"center"}}>
+              <T>Permitir quantidade por opção</T>
+              <Switch value={g.allow_quantity??false} onValueChange={v=>setProductForm(p=>p?{...p,option_groups:p.option_groups.map(x=>x.id===g.id?{...x,allow_quantity:v,max_select:undefined}:x)}:p)}/>
+            </View>
+            <View style={{flexDirection:"row",gap:12}}>
+              <View style={{flex:1}}><Field label="Mínimo de escolhas" keyboardType="number-pad"
+                value={String(g.min_select??(g.required?1:0))}
+                onChangeText={v=>setProductForm(p=>p?{...p,option_groups:p.option_groups.map(x=>x.id===g.id?{...x,min_select:Number(v)}:x)}:p)}/></View>
+              <View style={{flex:1}}><Field label="Máximo de escolhas" keyboardType="number-pad"
+                value={String(g.max_select??selectionBounds(g).max)}
+                onChangeText={v=>setProductForm(p=>p?{...p,option_groups:p.option_groups.map(x=>x.id===g.id?{...x,max_select:Number(v)}:x)}:p)}/></View>
+            </View>
+          </>}
           {g.options.map((o,oi)=><View key={o.id} style={{gap:8}}>
             <Field label={"Opção "+(oi+1)} value={o.name} onChangeText={v=>setProductForm(p=>p?{
               ...p,option_groups:p.option_groups.map(x=>x.id===g.id?{...x,options:x.options.map(a=>a.id===o.id?{...a,name:v}:a)}:x)
@@ -411,6 +427,12 @@ export default function SellerPanel() {
             <Field label="Preço adicional (R$)" keyboardType="decimal-pad"
               value={optionPriceDrafts[o.id]??formatBRLInput(o.price_cents)}
               onChangeText={v=>setOptionPriceDrafts(previous=>({...previous,[o.id]:v}))}/>
+            <View style={{flexDirection:"row",alignItems:"center",justifyContent:"space-between"}}>
+              <T>Ingrediente disponível</T>
+              <Switch value={o.available!==false} onValueChange={v=>setProductForm(p=>p?{
+                ...p,option_groups:p.option_groups.map(x=>x.id===g.id?{...x,options:x.options.map(a=>a.id===o.id?{...a,available:v}:a)}:x)
+              }:p)}/>
+            </View>
             <Button title="Remover opção" secondary disabled={g.options.length<=1}
               onPress={()=>setProductForm(p=>p?{...p,
                 option_groups:p.option_groups.map(x=>x.id===g.id?{...x,options:x.options.filter(a=>a.id!==o.id)}:x)
