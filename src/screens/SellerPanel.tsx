@@ -86,8 +86,10 @@ export default function SellerPanel() {
   const [shop,setShop]=useState<Shop|null>(null);
   const [products,setProducts]=useState<Product[]>([]);
   const [orders,setOrders]=useState<Order[]>([]);
-  const visibleOrders=focusedOrder.data?.order
-    ? [focusedOrder.data.order,...orders.filter(o=>o.id!==focusedOrder.data!.order.id)]
+  // Prefer the freshest response after a seller changes status.
+  const focusItem=orders.find(o=>o.id===focusedOrderId)??focusedOrder.data?.order;
+  const visibleOrders=focusItem
+    ? [focusItem,...orders.filter(o=>o.id!==focusItem.id)]
     : orders;
   const [ordersCursor,setOrdersCursor]=useState<string|null>(null);
   const [loadingOlder,setLoadingOlder]=useState(false);
@@ -376,10 +378,12 @@ export default function SellerPanel() {
             {o.status==="awaiting_confirmation"&&<Button title="Confirmar pedido" busy={busy} onPress={()=>void run(async()=>{
               await api.request("orders/"+o.id,"PATCH",{status:"confirmed"});
               await refreshLatestOrders();
+              if (focusedOrderId===o.id) await focusedOrder.reload().catch(()=>{});
             })}/>}
             {o.status==="confirmed"&&<Button title="Concluir pedido" busy={busy} onPress={()=>void run(async()=>{
               await api.request("orders/"+o.id,"PATCH",{status:"completed"});
               await refreshLatestOrders();
+              if (focusedOrderId===o.id) await focusedOrder.reload().catch(()=>{});
             })}/>}
             {["awaiting_confirmation","confirmed"].includes(o.status)&&
               <Button title="Cancelar pedido" secondary busy={busy} onPress={()=>Alert.alert("Cancelar pedido?","Esta ação altera o status do pedido.",[
@@ -387,6 +391,7 @@ export default function SellerPanel() {
                 {text:"Cancelar pedido",style:"destructive",onPress:()=>void run(async()=>{
                   await api.request("orders/"+o.id,"PATCH",{status:"cancelled"});
                   await refreshLatestOrders();
+                  if (focusedOrderId===o.id) await focusedOrder.reload().catch(()=>{});
                 })}])}/>}
           </View>)}
         {!!ordersCursor&&<Button title={loadingOlder?"Carregando pedidos...":"Ver pedidos anteriores"}
