@@ -40,6 +40,7 @@ import {
 import { colors, fonts, money } from "./theme";
 import { useAuth } from "./auth";
 import { useMarket } from "./market";
+import { useQuery } from "@tanstack/react-query";
 import type { Product, Shop } from "./types";
 export function T({
   bold,
@@ -219,7 +220,17 @@ export function Screen({
   backLabel?: string;
   refreshControl?: React.ReactElement<RefreshControlProps>;
 }) {
-  const { viewer } = useAuth();
+  const { viewer, api } = useAuth();
+  const { data: pushSummary } = useQuery<{ unread_count: number }>({
+    queryKey: ["push/summary", viewer?.id, viewer?.condominium_id],
+    queryFn: () => api.request<{ unread_count: number }>("push/summary"),
+    enabled: !!viewer,
+    staleTime: 5000,
+    refetchInterval: 20000, // Inbox badge works even when remote push is disabled.
+    refetchOnMount: "always",
+    retry: false,
+  });
+  const unreadCount = Math.max(0, pushSummary?.unread_count ?? 0);
   const { cart } = useMarket();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -285,6 +296,22 @@ export function Screen({
               style={s.headerAction}
             >
               <Bell size={20} color={colors.ink} />
+              {unreadCount > 0 && (
+                <View
+                  accessibilityLabel={unreadCount+" notificações não lidas"}
+                  style={{
+                    position: "absolute",
+                    top: 4,
+                    right: 4,
+                    width: 9,
+                    height: 9,
+                    borderRadius: 5,
+                    backgroundColor: "#E02B35",
+                    borderWidth: 1,
+                    borderColor: "white",
+                  }}
+                />
+              )}
             </Pressable>
             <Pressable
               accessibilityRole="button"
