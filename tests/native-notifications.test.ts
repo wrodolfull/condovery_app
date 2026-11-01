@@ -10,10 +10,10 @@ test("seller's new orders and completion reminders open native seller Orders",()
   assert.deepEqual(notificationDestination(notice("seller_order")),{screen:"seller",tab:"Pedidos",orderId:id});
   assert.deepEqual(notificationDestination(notice("seller_reminder")),{screen:"seller",tab:"Pedidos",orderId:id});
 });
-test("seller reviews open native Reviews; buyer status and moderation open buyer order",()=>{
+test("seller reviews open native Reviews; buyer status opens the own order",()=>{
   assert.deepEqual(notificationDestination(notice("seller_review")),{screen:"seller",tab:"Avaliações",reviewId:id});
   assert.deepEqual(notificationDestination(notice("order")),{screen:"buyer-order",orderId:id});
-  assert.deepEqual(notificationDestination(notice("review_update")),{screen:"buyer-order",orderId:id});
+
 });
 test("announcements and malformed targets safely open inbox notice detail",()=>{
   assert.deepEqual(notificationDestination(notice("condominium")),{screen:"notice"});

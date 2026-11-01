@@ -20,7 +20,7 @@ export function notificationDestination(
     return { screen: "seller", tab: "Pedidos", ...(uuid(id) ? { orderId: id! } : {}) };
   if (notice.kind === "seller_review")
     return { screen: "seller", tab: "Avaliações", ...(uuid(id) ? { reviewId: id! } : {}) };
-  if ((notice.kind === "order" || notice.kind === "review_update") && uuid(id))
+  if (notice.kind === "order" && uuid(id))
     return { screen: "buyer-order", orderId: id! };
   if (notice.kind === "shop" && uuid(id))
     return { screen: "shop", shopId: id! };

@@ -684,7 +684,7 @@ export function OrderDetail({ success = false }: { success?: boolean }) {
                       description: review,
                     })
                     .then(() => {
-                      setMessage("Avaliação enviada para moderação.");
+                      setMessage("Avaliação enviada. Obrigado!");
                       return r.reload();
                     })
                     .catch(alertError)

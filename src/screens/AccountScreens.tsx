@@ -611,7 +611,7 @@ export function NoticeDetail() {
           <T style={{ color: colors.muted, fontSize: 12 }}>
             {new Date(n.created_at).toLocaleString("pt-BR")}
           </T>
-          {(n.kind === "order" || n.kind === "review_update") && n.target_id && (
+          {n.kind === "order" && n.target_id && (
             <Button
               title="Ver meu pedido"
               onPress={() =>
