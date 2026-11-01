@@ -35,5 +35,5 @@ test("seller panel accepts tab and record deep links",()=>{
   assert.match(panel,/useLocalSearchParams/);
   assert.match(panel,/focusedOrderId/);
   assert.match(panel,/focusedReviewId/);
-  assert.match(panel,/orders\/"+focusedOrderId/);
+  assert.match(panel,/"orders\\/"\\+focusedOrderId/);
 });
