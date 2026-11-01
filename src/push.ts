@@ -8,8 +8,10 @@ import { router } from "expo-router";
 import { useAuth } from "./auth";
 import { secure } from "./storage";
 import { PushRegistrationGate } from "./domain/push-registration";
+import { shouldAutoRequestPushPermission } from "./domain/push-permission";
 // AuthProvider creates a new API client for every new login session.
 const registrationGates = new WeakMap<object, PushRegistrationGate>();
+const AUTO_PERMISSION_PROMPT_KEY = "push_permission_prompted_v1";
 function gateFor(api: object) {
   let gate = registrationGates.get(api);
   if (!gate) { gate = new PushRegistrationGate(); registrationGates.set(api, gate); }
@@ -43,7 +45,21 @@ export function usePush(listen = true) {
             importance: Notifications.AndroidImportance.HIGH,
           });
       let permission = await Notifications.getPermissionsAsync();
-      if (!permission.granted && ask)
+      // The normal registration path never showed Android's runtime permission
+      // dialog. Trigger it once after login, with a channel already created.
+      const autoRequest =
+        !ask &&
+        shouldAutoRequestPushPermission(
+          Platform.OS,
+          permission,
+          (await secure.get(AUTO_PERMISSION_PROMPT_KEY)) === "1",
+        );
+      if (autoRequest) {
+        // Remember the attempt before the system dialog to avoid repeated
+        // prompts if the process is recreated during the permission flow.
+        await secure.set(AUTO_PERMISSION_PROMPT_KEY, "1");
+      }
+      if (!permission.granted && permission.canAskAgain && (ask || autoRequest))
         permission = await Notifications.requestPermissionsAsync();
       if (!permission.granted) {
         await api.request("push/devices", "DELETE");
@@ -111,8 +127,11 @@ export function usePush(listen = true) {
         });
         cleanup.push(() => rotated.remove());
         handle(N.getLastNotificationResponse());
-        await N.clearLastNotificationResponseAsync();
-        await register();
+        // A stale response must not block permission onboarding.
+        await N.clearLastNotificationResponseAsync().catch(() => {});
+        // Any authenticated registration may perform first-use onboarding.
+        // The SecureStore flag and session gate prevent repeated dialogs.
+        if (alive) await register();
       })
       .catch(() => {});
     const foreground = AppState.addEventListener("change", (state) => {
@@ -124,5 +143,16 @@ export function usePush(listen = true) {
       cleanup.forEach((fn) => fn());
     };
   }, [viewer, api, register, listen]);
-  return { activate: () => register(true) };
+  return {
+    activate: async () => {
+      await register(true);
+      // A manual button press should never report success if an automatic
+      // registration was still in progress and the permission was declined.
+      if (compatible()) {
+        const N = await import("expo-notifications");
+        if (!(await N.getPermissionsAsync()).granted)
+          throw new Error("Permita as notificações nas configurações do aparelho.");
+      }
+    },
+  };
 }

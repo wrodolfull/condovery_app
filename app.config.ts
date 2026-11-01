@@ -22,6 +22,8 @@ const config: ExpoConfig = {
 
   android: {
     package: "pro.elevadoor.app",
+    // Android 13+ requires a runtime opt-in in addition to manifest permission.
+    permissions: ["android.permission.POST_NOTIFICATIONS"],
     // Local EAS builds do not download remote secret file variables.
     // Prefer the explicit EAS file path; otherwise use the local Firebase file.
     ...(process.env.GOOGLE_SERVICES_FILE || existsSync("./google-services.json")

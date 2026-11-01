@@ -76,9 +76,12 @@ Identificadores configurados: `com.wrodolfull.condovery` em Android e iOS; esque
 2. Configure as credenciais de push APNs para iOS pelo EAS.
 3. Habilite a segurança adicional do serviço de push no projeto Expo e configure o token privado do servidor em `EXPO_ACCESS_TOKEN` no backend.
 4. No backend, configure `EXPO_PROJECT_ID` e `PUSH_ENABLED=true`, e execute o worker `npm run push:dispatch` a cada minuto. Detalhes no documento do backend.
-5. Instale uma development build em um **aparelho físico**, entre no app e acesse **Conta → Preferências de notificações → Ativar notificações neste aparelho**.
+5. Gere e instale um **novo APK Android** (development build ou preview) em um aparelho físico. Após o primeiro login/cadastro aprovado, o Android solicita a permissão de notificações caso ela ainda esteja pendente. Quem autorizar terá o dispositivo registrado automaticamente.
+6. Se a pessoa já recusou a permissão ou a desativou nas configurações do Android, o aplicativo **não repete automaticamente** a solicitação. Ela pode habilitar a permissão nas configurações do aparelho e usar **Conta → Preferências de notificações → Ativar notificações neste aparelho** para registrar o dispositivo.
 
-O app não pede permissão de notificação antes da ação do usuário. Dispositivos já autorizados são sincronizados ao entrar e ao voltar ao primeiro plano. O backend deriva o destinatário e condomínio da sessão; nenhum remetente escolhe um token arbitrário.
+O app solicita a permissão apenas na primeira utilização autenticada elegível no Android; nunca na tela de login. O diálogo depende da versão do Android e das decisões anteriores do usuário. A solicitação ocorre **depois de criar os canais de notificações**; no Android 13+ é utilizada a permissão `POST_NOTIFICATIONS`. O estado de tentativa fica guardado por instalação. Dispositivos já autorizados são sincronizados ao entrar e ao voltar ao primeiro plano. O backend deriva o destinatário e condomínio da sessão; nenhum remetente escolhe um token arbitrário.
+
+**Importante:** autorizar a permissão não garante o recebimento de push: FCM, o projeto Expo, `PUSH_ENABLED=true` e o worker de envio precisam estar configurados. A CI não substitui um teste no APK real.
 
 Na página de uma loja, **Receber avisos desta loja** inscreve o morador nas novidades daquele vendedor. Os avisos do condomínio e as atualizações de pedidos têm controles separados. A permissão do aparelho também precisa estar habilitada.
 
