@@ -118,7 +118,7 @@ const campaigns = [0, 1].map((i) => ({
 }));
 const navLabels = ["Início", "Explorar", "Salvos", "Pedidos", "Conta"];
 
-async function enter(page: Page, withAds = true, withFairs = true, extendedCatalog = false, closedShop = false) {
+async function enter(page: Page, withAds = true, withFairs = true, extendedCatalog = false, closedShop = false, unreadCount = 0) {
   const errors: string[] = [],
     impressions: string[] = [];
   let favoriteIds: string[] = [];
@@ -247,6 +247,10 @@ async function enter(page: Page, withAds = true, withFairs = true, extendedCatal
       };
     else if (endpoint.startsWith("push/shops/")) value = { subscribed: false };
     else if (endpoint === "orders") value = { orders: [] };
+    else if (endpoint === "push/summary")
+      value = { unread_count: unreadCount };
+    else if (endpoint === "push/status")
+      value = { registered_devices: 1, transport_enabled: true, provider_configured: true };
     else if (endpoint === "push/inbox")
       value = { notifications: [], hasMore: false };
     else if (endpoint === "push/preferences")
@@ -291,6 +295,12 @@ async function checkNav(page: Page, selected?: string) {
     ),
   ).toBe(true);
 }
+
+test("notification icon shows an unread badge when the server reports new notices", async ({page})=>{
+  const {errors}=await enter(page,true,true,false,false,2);
+  await expect(page.getByLabel("2 notificações não lidas")).toBeVisible();
+  expect(errors).toEqual([]);
+});
 
 for (const width of [360, 390, 430]) {
   test(`buyer navigation, cards and store remain usable at ${width}px`, async ({

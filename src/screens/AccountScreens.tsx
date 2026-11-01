@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Modal, Pressable, Switch, View } from "react-native";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Bell, ChevronRight, CircleHelp, Gift, LogOut, Receipt,
   Settings, ShieldCheck, Store, Trash2,
@@ -417,6 +418,7 @@ export function Preferences() {
   const r = useResource<{ preferences: PushPreferences; is_seller: boolean }>(
     "push/preferences",
   );
+  const status = useResource<{ registered_devices: number; transport_enabled: boolean; provider_configured: boolean }>("push/status");
   const [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
   return (
@@ -435,12 +437,34 @@ export function Preferences() {
           setBusy(true);
           push
             .activate()
-            .then(() => setMessage("Notificações ativadas neste aparelho."))
+            .then(async () => {
+              const latest = await status.reload();
+              if (!latest?.registered_devices)
+                throw new Error("A permissão foi autorizada, mas este aparelho não está registrado no servidor.");
+              setMessage(
+                latest.transport_enabled && latest.provider_configured
+                  ? "Aparelho registrado. As notificações dependem também do envio pelo servidor."
+                  : "Aparelho registrado, mas o envio push ainda precisa ser habilitado ou configurado no servidor.",
+              );
+            })
             .catch(alertError)
             .finally(() => setBusy(false));
         }}
       />
       {message && <T style={{ color: colors.green }}>{message}</T>}
+      <Card style={{gap:6}}>
+        <T bold>Diagnóstico de notificações</T>
+        {status.loading && <T style={{color:colors.muted}}>Verificando registro...</T>}
+        {!!status.error && <T style={{color:colors.muted}}>Não foi possível consultar o status: {status.error}</T>}
+        {status.data && <>
+          <T>Registro do aparelho: {status.data.registered_devices>0?"Ativo":"Não registrado"}</T>
+          <T>Envio pelo servidor: {status.data.transport_enabled?"Habilitado":"Desativado"}</T>
+          <T>Credenciais de envio: {status.data.provider_configured?"Configuradas":"Pendentes"}</T>
+          <T style={{fontSize:12,color:colors.muted}}>
+            O envio também exige um worker ativo e credenciais FCM válidas; essas etapas não podem ser verificadas pelo app.
+          </T>
+        </>}
+      </Card>
       <ErrorBox message={r.error} />
       {r.loading && <Loading />}
       {r.data &&
@@ -486,6 +510,16 @@ export function Preferences() {
 }
 export function Inbox() {
   const [page, setPage] = useState(0);
+  const {viewer}=useAuth();
+  const queryClient=useQueryClient();
+  useFocusEffect(useCallback(()=>{
+    // A remote notice may have been created while the app was in background,
+    // even if FCM is disabled. Always refresh the inbox on return.
+    void queryClient.invalidateQueries({predicate:q=>
+      q.queryKey[0]===viewer?.id && q.queryKey[1]===viewer?.condominium_id &&
+      typeof q.queryKey[2]==="string" && q.queryKey[2].startsWith("push/inbox?")
+    });
+  },[queryClient,viewer?.id,viewer?.condominium_id,page]));
   const r = useResource<{ notifications: Notice[]; hasMore: boolean }>(
     "push/inbox?page=" + page,
   );
@@ -547,11 +581,22 @@ export function Inbox() {
 export function NoticeDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { api } = useAuth();
+  const queryClient=useQueryClient();
   const r = useResource<{ notification: Notice }>("push/inbox/" + id);
   const n = r.data?.notification;
   useEffect(() => {
-    if (n) void api.request("push/inbox/" + id, "PATCH").catch(() => {});
-  }, [n, api, id]);
+    if (!n || n.read_at) return;
+    void api.request("push/inbox/" + id, "PATCH")
+      .then(async()=>{
+        await Promise.all([
+          queryClient.invalidateQueries({queryKey:["push/summary"]}),
+          queryClient.invalidateQueries({predicate:q=>
+            typeof q.queryKey[2]==="string"&&q.queryKey[2].startsWith("push/inbox?")
+          }),
+        ]);
+      })
+      .catch(() => {});
+  }, [n?.id,n?.read_at,api,id,queryClient]);
   return (
     <Screen title="Aviso" back>
       <ErrorBox message={r.error} />
@@ -589,10 +634,8 @@ export function NoticeDetail() {
           )}
           {n.kind === "seller_order" && (
             <Button
-              title="Abrir painel da loja no navegador"
-              onPress={() =>
-                void openWeb(api.web("/?painel=vendedor")).catch(alertError)
-              }
+              title="Ver pedidos da minha loja"
+              onPress={() => router.push("/vendedor")}
             />
           )}
         </>
