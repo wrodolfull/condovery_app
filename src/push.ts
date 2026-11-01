@@ -8,8 +8,10 @@ import { router } from "expo-router";
 import { useAuth } from "./auth";
 import { secure } from "./storage";
 import { PushRegistrationGate } from "./domain/push-registration";
+import { shouldAutoRequestPushPermission } from "./domain/push-permission";
 // AuthProvider creates a new API client for every new login session.
 const registrationGates = new WeakMap<object, PushRegistrationGate>();
+const AUTO_PERMISSION_PROMPT_KEY = "push_permission_prompted_v1";
 function gateFor(api: object) {
   let gate = registrationGates.get(api);
   if (!gate) { gate = new PushRegistrationGate(); registrationGates.set(api, gate); }
@@ -24,7 +26,7 @@ const idValid = (id: unknown): id is string =>
 export function usePush(listen = true) {
   const { viewer, api } = useAuth();
   const register = useCallback(
-    (ask = false) => gateFor(api).run(async () => {
+    (ask = false, firstUse = false) => gateFor(api).run(async () => {
       if (!compatible()) {
         if (ask)
           throw new Error(
@@ -43,7 +45,21 @@ export function usePush(listen = true) {
             importance: Notifications.AndroidImportance.HIGH,
           });
       let permission = await Notifications.getPermissionsAsync();
-      if (!permission.granted && ask)
+      // The normal registration path never showed Android's runtime permission
+      // dialog. Trigger it once after login, with a channel already created.
+      const autoRequest =
+        firstUse &&
+        shouldAutoRequestPushPermission(
+          Platform.OS,
+          permission,
+          (await secure.get(AUTO_PERMISSION_PROMPT_KEY)) === "1",
+        );
+      if (autoRequest) {
+        // Remember the attempt before the system dialog to avoid repeated
+        // prompts if the process is recreated during the permission flow.
+        await secure.set(AUTO_PERMISSION_PROMPT_KEY, "1");
+      }
+      if (!permission.granted && permission.canAskAgain && (ask || autoRequest))
         permission = await Notifications.requestPermissionsAsync();
       if (!permission.granted) {
         await api.request("push/devices", "DELETE");
@@ -112,7 +128,9 @@ export function usePush(listen = true) {
         cleanup.push(() => rotated.remove());
         handle(N.getLastNotificationResponse());
         await N.clearLastNotificationResponseAsync();
-        await register();
+        // Only the first authenticated registration may request permission
+        // automatically. Foreground refreshes remain silent.
+        if (alive) await register(false, true);
       })
       .catch(() => {});
     const foreground = AppState.addEventListener("change", (state) => {
