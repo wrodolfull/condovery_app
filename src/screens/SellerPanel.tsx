@@ -74,10 +74,9 @@ export default function SellerPanel() {
   const ownerId=viewer?.id??'';
   const condominiumId=viewer?.condominium_id??'';
   const market=useMarket();
-  const [tab,setTab]=useState<Tab>("Pedidos");
-  useEffect(()=>{
-    if(requestedTab==="Pedidos"||requestedTab==="Avaliações")setTab(requestedTab);
-  },[requestedTab,focusedOrderId,focusedReviewId]);
+  // The route keys the panel by its notification target so a new tap
+  // initializes the requested tab without an effect-driven state reset.
+  const [tab,setTab]=useState<Tab>(requestedTab==="Avaliações"?"Avaliações":"Pedidos");
   // The referenced order might be older than the first paginated seller page.
   // The server authorizes access only to this shop's owner or the buyer.
   const focusedOrder=useResource<{order:Order}>(
