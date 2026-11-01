@@ -19,6 +19,7 @@ import {
 import { AuthProvider, useAuth } from "../auth";
 import { MarketProvider } from "../market";
 import { usePush } from "../push";
+import { PushOnboarding } from "../PushOnboarding";
 import { colors } from "../theme";
 export default function Root() {
   const [loaded, error] = useFonts({
@@ -115,6 +116,7 @@ function Navigator() {
       </View>
     );
   return (
+    <>
     <Stack
       screenOptions={{
         headerShown: false,
@@ -129,5 +131,7 @@ function Navigator() {
       </Stack.Protected>
       <Stack.Screen name="auth/callback" />
     </Stack>
+    {!!viewer && <PushOnboarding />}
+    </>
   );
 }
