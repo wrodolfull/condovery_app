@@ -58,8 +58,9 @@ import {
 } from "../ui";
 import { colors, fonts, money } from "../theme";
 import {
-  extrasTotal,
-  selectedOptions,
+  previewExtrasTotal,
+  selectionBounds,
+  changeOptionSelection,
   unitPrice,
   type Selection,
 } from "../domain/orders";
@@ -1187,14 +1188,7 @@ export function ProductDetail() {
     [choices, setChoices] = useState<Selection>({}),
     [error, setError] = useState("");
   let extra = 0;
-  try {
-    extra = extrasTotal(
-      selectedOptions(
-        (p?.option_groups ?? []).map((g) => ({ ...g, required: false })),
-        choices,
-      ),
-    );
-  } catch {}
+  try { extra = previewExtrasTotal(p?.option_groups ?? [], choices); } catch {}
   return (
     <Screen title="Produto" back>
       <ErrorBox message={r.error || error} />
@@ -1223,49 +1217,43 @@ export function ProductDetail() {
             {money(unitPrice(p) + extra)}
           </T>
           <View pointerEvents={purchasable?"auto":"none"} style={{gap:14,opacity:purchasable?1:0.5}}>
-          {p.option_groups?.map((group) => (
-            <Card key={group.id}>
-              <T bold>
-                {group.name} {group.required ? "· Obrigatório" : "· Opcional"}
-              </T>
-              <T style={{ fontSize: 12 }}>
-                {group.multiple
-                  ? "Escolha uma ou mais opções"
-                  : "Escolha uma opção"}
+          {p.option_groups?.map((group) => {
+            const chosen = choices[group.id] ?? [];
+            const {min,max} = selectionBounds(group);
+            return <Card key={group.id}>
+              <T bold>{group.name} · {min>0?"Obrigatório":"Opcional"}</T>
+              <T style={{fontSize:12,color:colors.muted}}>
+                {group.multiple?"Várias escolhas":"Escolha uma"} · {chosen.length}/{max} selecionado(s){min>1?" · mínimo "+min:""}
               </T>
               {group.options.map((o) => {
-                const checked = choices[group.id]?.includes(o.id);
-                return (
-                  <Pressable
-                    key={o.id}
-                    accessibilityRole={group.multiple ? "checkbox" : "radio"}
-                    accessibilityState={{ checked: !!checked }}
-                    onPress={() =>
-                      setChoices((old) => ({
-                        ...old,
-                        [group.id]: checked
-                          ? (old[group.id] ?? []).filter((id) => id !== o.id)
-                          : group.multiple
-                            ? [...(old[group.id] ?? []), o.id]
-                            : [o.id],
-                      }))
-                    }
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "space-between",
-                      gap: 12,
-                      paddingVertical: 9,
-                    }}
-                  >
-                    <T style={{ flex: 1 }}>
-                      {checked ? "●" : "○"} {o.name}
-                    </T>
-                    <T>{o.price_cents ? "+" + money(o.price_cents) : ""}</T>
-                  </Pressable>
-                );
+                const count=chosen.filter(id=>id===o.id).length;
+                const available=o.available!==false;
+                return group.multiple&&group.allow_quantity?
+                  <View key={o.id} style={{flexDirection:"row",justifyContent:"space-between",alignItems:"center",paddingVertical:10,gap:10,opacity:available?1:0.5}}>
+                    <View style={{flex:1,gap:3}}>
+                      <T>{o.name}{available?"":" · Indisponível"}</T>
+                      <T style={{fontSize:12,color:colors.muted}}>{o.price_cents?"+"+money(o.price_cents)+" por unidade":"Incluso"}</T>
+                    </View>
+                    <Quantity min={0} value={count}
+                      max={available?count+Math.max(0,max-chosen.length):0}
+                      onChange={next=>setChoices(old=>({...old,
+                        [group.id]:changeOptionSelection(group,old[group.id]??[],o.id,next>count?1:-1)
+                      }))}/>
+                  </View>:
+                  <Pressable key={o.id} disabled={!available} accessibilityRole={group.multiple?"checkbox":"radio"}
+                    accessibilityState={{checked:count>0,disabled:!available}}
+                    onPress={()=>setChoices(old=>({...old,
+                      [group.id]:changeOptionSelection(group,old[group.id]??[],o.id,1)
+                    }))}
+                    style={{flexDirection:"row",justifyContent:"space-between",gap:12,paddingVertical:9,opacity:available?1:0.45}}>
+                    <T style={{flex:1}}>{count>0?"●":"○"} {o.name}{available?"":" · Indisponível"}</T>
+                    <T>{o.price_cents?"+"+money(o.price_cents):"Incluso"}</T>
+                  </Pressable>;
               })}
-            </Card>
-          ))}
+              {!group.multiple&&!group.required&&chosen.length>0&&
+                <Button title="Limpar escolha" secondary onPress={()=>setChoices(old=>({...old,[group.id]:[]}))}/>}
+            </Card>;
+          })}
           <Field
             label="Observações do item"
             value={note}
