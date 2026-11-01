@@ -1,24 +1,14 @@
 /**
- * Android 13+ shows the notification system dialog only when requested.
- * Ask once after the first authenticated session while permission is undecided.
- * Do not reprompt after a denial: the user can opt in from Preferences.
+ * The native consent invitation must be visible once per installation when
+ * notifications are disabled. The previous automatic request attempted to
+ * persist "asked" before Android had actually shown its system dialog.
  */
-export type PushPermissionSnapshot = {
-  granted: boolean;
-  canAskAgain: boolean;
-  status: string;
-};
-
-export function shouldAutoRequestPushPermission(
+export function shouldShowPushOnboarding(
   platform: string,
-  permission: PushPermissionSnapshot,
-  previouslyPrompted: boolean,
+  isPhysicalBuild: boolean,
+  permissionGranted: boolean,
+  dismissed: boolean,
 ): boolean {
-  return (
-    platform === "android" &&
-    !previouslyPrompted &&
-    permission.status === "undetermined" &&
-    !permission.granted &&
-    permission.canAskAgain
-  );
+  return (platform === "android" || platform === "ios")
+    && isPhysicalBuild && !permissionGranted && !dismissed;
 }
