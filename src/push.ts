@@ -1,5 +1,6 @@
 import type { NotificationResponse } from "expo-notifications";
 import { useCallback, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { AppState, Platform } from "react-native";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
@@ -25,6 +26,11 @@ const idValid = (id: unknown): id is string =>
   typeof id === "string" && /^[0-9a-f-]{36}$/i.test(id);
 export function usePush(listen = true) {
   const { viewer, api } = useAuth();
+  const queryClient=useQueryClient();
+  const refreshInbox=useCallback(()=>{
+    void queryClient.invalidateQueries({queryKey:["push/summary"]});
+    void queryClient.invalidateQueries({predicate:q=>typeof q.queryKey[2]==="string"&&q.queryKey[2].startsWith("push/inbox")});
+  },[queryClient]);
   const register = useCallback(
     (ask = false) => gateFor(api).run(async () => {
       if (!compatible()) {
@@ -118,8 +124,13 @@ export function usePush(listen = true) {
           if (idValid(id))
             router.push({ pathname: "/aviso/[id]", params: { id } });
         };
-        const sub = N.addNotificationResponseReceivedListener(handle);
+        const sub = N.addNotificationResponseReceivedListener((response)=>{
+          refreshInbox();
+          handle(response);
+        });
         cleanup.push(() => sub.remove());
+        const foregroundPush=N.addNotificationReceivedListener(()=>refreshInbox());
+        cleanup.push(()=>foregroundPush.remove());
         const rotated = N.addPushTokenListener(() => {
           // Native token changes may fire repeatedly while Expo refreshes its token.
           // Use the same coalescing/cooldown as foreground registration.
@@ -142,7 +153,7 @@ export function usePush(listen = true) {
       foreground.remove();
       cleanup.forEach((fn) => fn());
     };
-  }, [viewer, api, register, listen]);
+  }, [viewer, api, register, listen, refreshInbox]);
   return {
     activate: async () => {
       await register(true);
