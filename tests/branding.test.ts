@@ -23,3 +23,10 @@ test("new app IDs match Elevadoor while the existing auth deep link stays compat
   assert.match(config,/package: "pro.elevadoor.app"/);
   assert.match(read("src/auth.tsx"),/condovery:\/\/auth\/callback/);
 });
+
+test("account shortcuts put seller before condominium fairs",()=>{
+  const source=read("src/screens/AccountScreens.tsx");
+  const first=source.indexOf('label: "Minha loja / Quero vender"');
+  const second=source.indexOf('label: "Feiras do condomínio"');
+  assert.ok(first>=0&&second>=0&&first<second,"Seller shortcut must appear first");
+});
