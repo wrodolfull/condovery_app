@@ -26,7 +26,7 @@ const idValid = (id: unknown): id is string =>
 export function usePush(listen = true) {
   const { viewer, api } = useAuth();
   const register = useCallback(
-    (ask = false, firstUse = false) => gateFor(api).run(async () => {
+    (ask = false) => gateFor(api).run(async () => {
       if (!compatible()) {
         if (ask)
           throw new Error(
@@ -48,7 +48,7 @@ export function usePush(listen = true) {
       // The normal registration path never showed Android's runtime permission
       // dialog. Trigger it once after login, with a channel already created.
       const autoRequest =
-        firstUse &&
+        !ask &&
         shouldAutoRequestPushPermission(
           Platform.OS,
           permission,
@@ -129,9 +129,9 @@ export function usePush(listen = true) {
         handle(N.getLastNotificationResponse());
         // A stale response must not block permission onboarding.
         await N.clearLastNotificationResponseAsync().catch(() => {});
-        // Only the first authenticated registration may request permission
-        // automatically. Foreground refreshes remain silent.
-        if (alive) await register(false, true);
+        // Any authenticated registration may perform first-use onboarding.
+        // The SecureStore flag and session gate prevent repeated dialogs.
+        if (alive) await register();
       })
       .catch(() => {});
     const foreground = AppState.addEventListener("change", (state) => {
