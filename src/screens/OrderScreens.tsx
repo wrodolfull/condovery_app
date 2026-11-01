@@ -233,6 +233,10 @@ export function Checkout() {
       {cart.items.map((i, index) => (
         <Card key={i.key}>
           <T bold>{i.product.name}</T>
+          {i.product.option_groups?.flatMap(group=>group.options.flatMap(option=>{
+            const count=(i.selections[group.id]??[]).filter(id=>id===option.id).length;
+            return count?[group.name+": "+(count>1?count+"x ":"")+option.name]:[];
+          })).map((description,j)=><T key={j} style={{fontSize:12,color:colors.muted}}>{description}</T>)}
           <T>{i.note}</T>
           <T>
             {money(
@@ -589,8 +593,8 @@ export function OrderDetail({ success = false }: { success?: boolean }) {
               </T>
               {item.options?.map((o, j) => (
                 <T key={j} style={{ fontSize: 12 }}>
-                  {o.group}: {o.name}{" "}
-                  {o.price_cents ? "(+" + money(o.price_cents) + ")" : ""}
+                  {o.group}: {o.quantity&&o.quantity>1?o.quantity+"x ":""}{o.name}{" "}
+                  {o.price_cents ? "(+" + money(o.price_cents*(o.quantity??1)) + ")" : ""}
                 </T>
               ))}
               {item.note ? <T>{item.note}</T> : null}

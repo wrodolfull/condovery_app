@@ -25,11 +25,16 @@ type Cart = {
   pending: PendingOrder | null;
 };
 const empty: Cart = { shop: null, items: [], pending: null };
-export const linePrice = (item: CartItem) =>
-  unitPrice(item.product) +
-  extrasTotal(
-    selectedOptions(item.product.option_groups ?? [], item.selections),
-  );
+export const linePrice = (item: CartItem) => {
+  // A saved cart can outlive changes to the seller's customization rules.
+  // Keep the screen renderable; the checkout quote will validate the choices again.
+  try {
+    return unitPrice(item.product) +
+      extrasTotal(selectedOptions(item.product.option_groups ?? [], item.selections));
+  } catch {
+    return unitPrice(item.product);
+  }
+};
 type Market = {
   home: Resource<HomeData>;
   favorites: Resource<{ ids: string[]; products: Product[] }>;

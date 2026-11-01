@@ -94,7 +94,7 @@ export type Order = {
     quantity: number;
     unit_price_cents: number;
     note: string;
-    options?: { group: string; name: string; price_cents: number }[];
+    options?: { group: string; name: string; price_cents: number; quantity?: number }[];
   }[];
 };
 export type Notice = {
@@ -116,7 +116,7 @@ export type Quote = {
     unit_price_cents: number;
     total_cents: number;
     note: string;
-    options: { group: string; name: string; price_cents: number }[];
+    options: { group: string; name: string; price_cents: number; quantity?: number }[];
   }[];
 };
 export const statusLabels: Record<string, string> = {

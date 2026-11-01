@@ -11,8 +11,9 @@ export function sellerItemDetails(item: SellerItem): string[] {
     (option) =>
       option.group +
       ": " +
+      (option.quantity && option.quantity>1 ? option.quantity+"x " : "") +
       option.name +
-      (option.price_cents > 0 ? " (+" + BRL(option.price_cents) + ")" : ""),
+      (option.price_cents > 0 ? " (+" + BRL(option.price_cents*(option.quantity??1)) + ")" : ""),
   );
   if (item.note?.trim()) result.push("Observação do produto: " + item.note.trim());
   return result;
