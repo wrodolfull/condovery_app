@@ -474,7 +474,7 @@ export function Preferences() {
             ["condominium", "Avisos do condomínio"],
             ["orders", "Atualizações dos meus pedidos"],
             ...(r.data.is_seller
-              ? [["seller_orders", "Novos pedidos na minha loja"]]
+              ? [["seller_orders", "Pedidos, avaliações e pendências da minha loja"]]
               : []),
           ] as [keyof PushPreferences, string][]
         ).map(([key, label]) => (
