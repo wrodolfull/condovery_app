@@ -11,7 +11,7 @@ test("concurrent registration triggers share one network operation", async () =>
     return new Promise<void>(resolve => { complete = resolve; });
   };
   const a = gate.run(action);
-  const b = gate.run(action, true);
+  const b = gate.run(action);
   assert.equal(requests, 1);
   complete();
   await Promise.all([a, b]);
@@ -49,5 +49,19 @@ test("session changes get independent gate", async () => {
   const b = new PushRegistrationGate(() => 0);
   await a.run(async () => { calls++; });
   await b.run(async () => { calls++; });
+  assert.equal(calls, 2);
+});
+
+test("forced activation after a passive request runs again with the granted permission", async () => {
+  let calls = 0;
+  let release!: () => void;
+  const gate = new PushRegistrationGate(() => 1000);
+  const passive = gate.run(async () => {
+    calls++;
+    await new Promise<void>(resolve => {release = resolve;});
+  });
+  const forced = gate.run(async () => {calls++;}, true);
+  release();
+  await Promise.all([passive, forced]);
   assert.equal(calls, 2);
 });
