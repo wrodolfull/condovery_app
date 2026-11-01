@@ -634,10 +634,8 @@ export function NoticeDetail() {
           )}
           {n.kind === "seller_order" && (
             <Button
-              title="Abrir painel da loja no navegador"
-              onPress={() =>
-                void openWeb(api.web("/?painel=vendedor")).catch(alertError)
-              }
+              title="Ver pedidos da minha loja"
+              onPress={() => router.push("/vendedor")}
             />
           )}
         </>
