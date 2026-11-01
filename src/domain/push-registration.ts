@@ -12,7 +12,11 @@ export class PushRegistrationGate {
   ) {}
 
   run(operation: () => Promise<void>, force = false): Promise<void> {
-    if (this.pending) return this.pending;
+    // An explicit user tap must retry after any passive in-flight refresh.
+    // Otherwise the first consent can be swallowed by a concurrent GET.
+    if (this.pending) return force
+      ? this.pending.catch(() => {}).then(() => this.run(operation, true))
+      : this.pending;
     if (!force && this.now() < this.nextAllowedAt) return Promise.resolve();
     const current = operation();
     // Set pending synchronously before awaiting, even if operation rejects.

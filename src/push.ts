@@ -9,10 +9,9 @@ import { router } from "expo-router";
 import { useAuth } from "./auth";
 import { secure } from "./storage";
 import { PushRegistrationGate } from "./domain/push-registration";
-import { shouldAutoRequestPushPermission } from "./domain/push-permission";
+import { useOpenNotification } from "./notifications";
 // AuthProvider creates a new API client for every new login session.
 const registrationGates = new WeakMap<object, PushRegistrationGate>();
-const AUTO_PERMISSION_PROMPT_KEY = "push_permission_prompted_v1";
 function gateFor(api: object) {
   let gate = registrationGates.get(api);
   if (!gate) { gate = new PushRegistrationGate(); registrationGates.set(api, gate); }
@@ -26,6 +25,7 @@ const idValid = (id: unknown): id is string =>
   typeof id === "string" && /^[0-9a-f-]{36}$/i.test(id);
 export function usePush(listen = true) {
   const { viewer, api } = useAuth();
+  const openNotification = useOpenNotification();
   const queryClient=useQueryClient();
   const refreshInbox=useCallback(()=>{
     void queryClient.invalidateQueries({queryKey:["push/summary"]});
@@ -50,29 +50,13 @@ export function usePush(listen = true) {
             name,
             importance: Notifications.AndroidImportance.HIGH,
           });
-      let permission = await Notifications.getPermissionsAsync();
-      // The normal registration path never showed Android's runtime permission
-      // dialog. Trigger it once after login, with a channel already created.
-      const autoRequest =
-        !ask &&
-        shouldAutoRequestPushPermission(
-          Platform.OS,
-          permission,
-          (await secure.get(AUTO_PERMISSION_PROMPT_KEY)) === "1",
-        );
-      if (autoRequest) {
-        // Remember the attempt before the system dialog to avoid repeated
-        // prompts if the process is recreated during the permission flow.
-        await secure.set(AUTO_PERMISSION_PROMPT_KEY, "1");
-      }
-      if (!permission.granted && permission.canAskAgain && (ask || autoRequest))
-        permission = await Notifications.requestPermissionsAsync();
+      const permission = await Notifications.getPermissionsAsync();
+      // Passive registrations must never consume the Android permission dialog.
+      // First-use onboarding provides an explicit, user-visible activation CTA.
       if (!permission.granted) {
         await api.request("push/devices", "DELETE");
         if (ask)
-          throw new Error(
-            "Permita as notificações nas configurações do aparelho.",
-          );
+          throw new Error("Permita as notificações nas configurações do aparelho.");
         return;
       }
       const projectId =
@@ -122,7 +106,10 @@ export function usePush(listen = true) {
           const id =
             response.notification.request.content.data?.notification_id;
           if (idValid(id))
-            router.push({ pathname: "/aviso/[id]", params: { id } });
+            void openNotification(id).catch(() => {
+              // If a stale push belongs to an old login, don't open foreign data.
+              if (alive) router.navigate("/notificacoes");
+            });
         };
         const sub = N.addNotificationResponseReceivedListener((response)=>{
           refreshInbox();
@@ -153,17 +140,25 @@ export function usePush(listen = true) {
       foreground.remove();
       cleanup.forEach((fn) => fn());
     };
-  }, [viewer, api, register, listen, refreshInbox]);
+  }, [viewer, api, register, listen, refreshInbox, openNotification]);
   return {
     activate: async () => {
-      await register(true);
-      // A manual button press should never report success if an automatic
-      // registration was still in progress and the permission was declined.
-      if (compatible()) {
-        const N = await import("expo-notifications");
-        if (!(await N.getPermissionsAsync()).granted)
-          throw new Error("Permita as notificações nas configurações do aparelho.");
+      if (!compatible())
+        throw new Error("Notificações precisam do APK Elevadoor instalado em um aparelho físico.");
+      const N = await import("expo-notifications");
+      if (Platform.OS === "android") {
+        for (const [id,name] of [["pedidos","Pedidos"],["avisos","Avisos do condomínio"]])
+          await N.setNotificationChannelAsync(id,{name,importance:N.AndroidImportance.HIGH});
       }
+      let permission = await N.getPermissionsAsync();
+      if (!permission.granted && permission.canAskAgain)
+        permission = await N.requestPermissionsAsync();
+      if (!permission.granted)
+        throw new Error("Notificações desativadas. Ative a permissão nas configurações do aparelho.");
+      await register(true);
+      const status=await api.request<{registered_devices:number}>("push/status");
+      if (status.registered_devices < 1)
+        throw new Error("Permissão concedida, mas o dispositivo não foi registrado para receber avisos.");
     },
   };
 }

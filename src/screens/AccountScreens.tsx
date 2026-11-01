@@ -9,6 +9,7 @@ import {
 import { useAuth } from "../auth";
 import { useResource } from "../hooks";
 import { usePush } from "../push";
+import { useOpenNotification } from "../notifications";
 import {
   Button,
   Card,
@@ -473,7 +474,7 @@ export function Preferences() {
             ["condominium", "Avisos do condomínio"],
             ["orders", "Atualizações dos meus pedidos"],
             ...(r.data.is_seller
-              ? [["seller_orders", "Novos pedidos na minha loja"]]
+              ? [["seller_orders", "Pedidos, avaliações e pendências da minha loja"]]
               : []),
           ] as [keyof PushPreferences, string][]
         ).map(([key, label]) => (
@@ -509,6 +510,7 @@ export function Preferences() {
   );
 }
 export function Inbox() {
+  const openNotification = useOpenNotification();
   const [page, setPage] = useState(0);
   const {viewer}=useAuth();
   const queryClient=useQueryClient();
@@ -536,9 +538,7 @@ export function Inbox() {
       {items.map((n) => (
         <Pressable
           key={n.id}
-          onPress={() =>
-            router.push({ pathname: "/aviso/[id]", params: { id: n.id } })
-          }
+          onPress={() => void openNotification(n).catch(alertError)}
         >
           <Card style={!n.read_at ? { borderColor: colors.orange } : undefined}>
             <T bold>{n.title}</T>
@@ -582,6 +582,7 @@ export function NoticeDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { api } = useAuth();
   const queryClient=useQueryClient();
+  const openNotification=useOpenNotification();
   const r = useResource<{ notification: Notice }>("push/inbox/" + id);
   const n = r.data?.notification;
   useEffect(() => {
@@ -610,7 +611,7 @@ export function NoticeDetail() {
           <T style={{ color: colors.muted, fontSize: 12 }}>
             {new Date(n.created_at).toLocaleString("pt-BR")}
           </T>
-          {n.kind === "order" && n.target_id && (
+          {(n.kind === "order" || n.kind === "review_update") && n.target_id && (
             <Button
               title="Ver meu pedido"
               onPress={() =>
@@ -632,10 +633,10 @@ export function NoticeDetail() {
               }
             />
           )}
-          {n.kind === "seller_order" && (
+          {(n.kind === "seller_order" || n.kind === "seller_reminder" || n.kind === "seller_review") && (
             <Button
-              title="Ver pedidos da minha loja"
-              onPress={() => router.push("/vendedor")}
+              title={n.kind === "seller_review" ? "Ver avaliações da minha loja" : "Ver pedidos da minha loja"}
+              onPress={() => void openNotification(n).catch(alertError)}
             />
           )}
         </>

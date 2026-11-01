@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, AppState, Pressable, ScrollView, Switch, View } from "react-native";
 import { randomUUID } from "expo-crypto";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../auth";
 import { useMarket } from "../market";
+import { useResource } from "../hooks";
 import { Button, Card, Empty, ErrorBox, Field, Loading, Picture, Screen, T } from "../ui";
 import { money, colors } from "../theme";
 import { uploadPicture } from "../upload";
@@ -53,9 +54,10 @@ const tabs=["Pedidos","Produtos","Avaliações","Minha loja","Resultados","Feira
 type Tab=typeof tabs[number];
 const line={backgroundColor:"#FFFCF8",borderColor:"#E9E4DB",borderWidth:1,borderRadius:14,padding:14,gap:9} as const;
 
-function SellerReviewRows({reviews,busy,onModerate}:{reviews:Review[];busy:boolean;onModerate:(id:string,status:"approved"|"rejected")=>void}) {
+function SellerReviewRows({reviews,busy,onModerate,focusReviewId}:{reviews:Review[];busy:boolean;onModerate:(id:string,status:"approved"|"rejected")=>void;focusReviewId?:string}) {
   if(!reviews.length)return <Empty title="Sem avaliações" body="As avaliações dos compradores aparecerão aqui."/>;
-  return <>{reviews.map(review=><View key={review.id} style={line}>
+  const sorted=focusReviewId?[...reviews].sort((a,b)=>a.id===focusReviewId?-1:b.id===focusReviewId?1:0):reviews;
+  return <>{sorted.map(review=><View key={review.id} style={review.id===focusReviewId?{...line,borderColor:colors.orange,borderWidth:2}:line}>
     <T bold>Pedido #{review.order_code} · {review.rating}/5 estrelas</T>
     <T>{review.description}</T>
     <T>{review.status==="pending"?"Aguardando moderação":review.status==="approved"?"Aprovada":"Recusada"}</T>
@@ -67,13 +69,28 @@ function SellerReviewRows({reviews,busy,onModerate}:{reviews:Review[];busy:boole
 
 export default function SellerPanel() {
   const {api,viewer}=useAuth();
+  const {tab:requestedTab,order_id:focusedOrderId,review_id:focusedReviewId}=
+    useLocalSearchParams<{tab?:string;order_id?:string;review_id?:string}>();
   const ownerId=viewer?.id??'';
   const condominiumId=viewer?.condominium_id??'';
   const market=useMarket();
-  const [tab,setTab]=useState<Tab>("Pedidos");
+  // The route keys the panel by its notification target so a new tap
+  // initializes the requested tab without an effect-driven state reset.
+  const [tab,setTab]=useState<Tab>(requestedTab==="Avaliações"?"Avaliações":"Pedidos");
+  // The referenced order might be older than the first paginated seller page.
+  // The server authorizes access only to this shop's owner or the buyer.
+  const focusedOrder=useResource<{order:Order}>(
+    tab==="Pedidos"&&focusedOrderId&&/^[0-9a-f-]{36}$/i.test(focusedOrderId)
+      ?"orders/"+focusedOrderId:null
+  );
   const [shop,setShop]=useState<Shop|null>(null);
   const [products,setProducts]=useState<Product[]>([]);
   const [orders,setOrders]=useState<Order[]>([]);
+  // Prefer the freshest response after a seller changes status.
+  const focusItem=orders.find(o=>o.id===focusedOrderId)??focusedOrder.data?.order;
+  const visibleOrders=focusItem
+    ? [focusItem,...orders.filter(o=>o.id!==focusItem.id)]
+    : orders;
   const [ordersCursor,setOrdersCursor]=useState<string|null>(null);
   const [loadingOlder,setLoadingOlder]=useState(false);
   const historyLoaded=useRef(false);
@@ -343,8 +360,8 @@ export default function SellerPanel() {
         </View>
         {!!ordersError&&<ErrorBox message={"Não foi possível atualizar os pedidos: "+ordersError}/>}
         {ordersLoading&&!lastOrdersUpdate?<Loading/>:
-          !ordersError&&!orders.length?<Empty title="Nenhum pedido recebido" body="Os pedidos da sua loja aparecerão aqui."/>:
-          orders.map(o=><View key={o.id} style={line}>
+          !ordersError&&!visibleOrders.length?<Empty title="Nenhum pedido recebido" body="Os pedidos da sua loja aparecerão aqui."/>:
+          visibleOrders.map(o=><View key={o.id} style={o.id===focusedOrderId?{...line,borderColor:colors.orange,borderWidth:2}:line}>
             <T bold style={{fontSize:17}}>Pedido #{o.code}</T>
             <T bold>{o.status==="awaiting_confirmation"?"Aguardando confirmação":o.status==="confirmed"?"Confirmado":o.status==="completed"?"Concluído":"Cancelado"}</T>
             {sellerOrderDetails(o).map((detail,i)=><T key={"detail-"+i}>{detail}</T>)}
@@ -361,10 +378,12 @@ export default function SellerPanel() {
             {o.status==="awaiting_confirmation"&&<Button title="Confirmar pedido" busy={busy} onPress={()=>void run(async()=>{
               await api.request("orders/"+o.id,"PATCH",{status:"confirmed"});
               await refreshLatestOrders();
+              if (focusedOrderId===o.id) await focusedOrder.reload().catch(()=>{});
             })}/>}
             {o.status==="confirmed"&&<Button title="Concluir pedido" busy={busy} onPress={()=>void run(async()=>{
               await api.request("orders/"+o.id,"PATCH",{status:"completed"});
               await refreshLatestOrders();
+              if (focusedOrderId===o.id) await focusedOrder.reload().catch(()=>{});
             })}/>}
             {["awaiting_confirmation","confirmed"].includes(o.status)&&
               <Button title="Cancelar pedido" secondary busy={busy} onPress={()=>Alert.alert("Cancelar pedido?","Esta ação altera o status do pedido.",[
@@ -372,6 +391,7 @@ export default function SellerPanel() {
                 {text:"Cancelar pedido",style:"destructive",onPress:()=>void run(async()=>{
                   await api.request("orders/"+o.id,"PATCH",{status:"cancelled"});
                   await refreshLatestOrders();
+                  if (focusedOrderId===o.id) await focusedOrder.reload().catch(()=>{});
                 })}])}/>}
           </View>)}
         {!!ordersCursor&&<Button title={loadingOlder?"Carregando pedidos...":"Ver pedidos anteriores"}
@@ -476,7 +496,9 @@ export default function SellerPanel() {
             })}])}/>
         </View>)}
       </>)}
-      {tab==="Avaliações"&&<SellerReviewRows reviews={reviews} busy={busy} onModerate={moderateReview}/>}
+      {tab==="Avaliações"&&<SellerReviewRows reviews={reviews} busy={busy} onModerate={moderateReview} focusReviewId={focusedReviewId}/>}
+      {tab==="Pedidos"&&!!focusedOrder.error&&<ErrorBox message={"Não foi possível abrir o pedido: "+focusedOrder.error}/>}
+
       {tab==="Minha loja"&&<Card>
         <T heading style={{fontSize:21}}>Dados da loja</T>
         {draftDirty&&<View style={{backgroundColor:"#FFF5D9",padding:12,borderRadius:12,gap:8}}>
