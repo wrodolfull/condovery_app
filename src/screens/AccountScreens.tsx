@@ -411,7 +411,9 @@ export function DeleteAccount() {
 type PushPreferences = {
   condominium: boolean;
   orders: boolean;
-  seller_orexport function Preferences() {
+  seller_orders: boolean;
+};
+export function Preferences() {
   const {api}=useAuth();
   const push=usePush(false);
   const r=useResource<{preferences:PushPreferences;is_seller:boolean}>("push/preferences");
@@ -559,9 +561,6 @@ export function Inbox() {
         onPress={()=>router.push("/preferencias")}
       />
     </Screen>
-  );
-}
- </Screen>
   );
 }
 export function NoticeDetail() {
