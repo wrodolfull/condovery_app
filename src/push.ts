@@ -11,6 +11,7 @@ import { secure } from "./storage";
 import { PushRegistrationGate } from "./domain/push-registration";
 import { useOpenNotification } from "./notifications";
 // AuthProvider creates a new API client for every new login session.
+const PUSH_OPT_OUT_KEY = "push_device_opt_out_v1";
 const registrationGates = new WeakMap<object, PushRegistrationGate>();
 function gateFor(api: object) {
   let gate = registrationGates.get(api);
@@ -28,11 +29,12 @@ export function usePush(listen = true) {
   const openNotification = useOpenNotification();
   const queryClient=useQueryClient();
   const refreshInbox=useCallback(()=>{
-    void queryClient.invalidateQueries({queryKey:["push/summary"]});
+    void queryClient.invalidateQueries({predicate:q=>typeof q.queryKey[2]==="string"&&q.queryKey[2].startsWith("push/summary")});
     void queryClient.invalidateQueries({predicate:q=>typeof q.queryKey[2]==="string"&&q.queryKey[2].startsWith("push/inbox")});
   },[queryClient]);
   const register = useCallback(
     (ask = false) => gateFor(api).run(async () => {
+      if (!ask && await secure.get(PUSH_OPT_OUT_KEY) === "1") return;
       if (!compatible()) {
         if (ask)
           throw new Error(
@@ -155,10 +157,34 @@ export function usePush(listen = true) {
         permission = await N.requestPermissionsAsync();
       if (!permission.granted)
         throw new Error("Notificações desativadas. Ative a permissão nas configurações do aparelho.");
-      await register(true);
-      const status=await api.request<{registered_devices:number}>("push/status");
-      if (status.registered_devices < 1)
-        throw new Error("Permissão concedida, mas o dispositivo não foi registrado para receber avisos.");
+      const wasDisabled = await secure.get(PUSH_OPT_OUT_KEY) === "1";
+      await secure.remove(PUSH_OPT_OUT_KEY);
+      try {
+        await register(true);
+        const status = await api.request<{registered_devices:number}>("push/status");
+        if (status.registered_devices < 1)
+          throw new Error("Permissão concedida, mas o dispositivo não foi registrado para receber avisos.");
+      } catch (error) {
+        if (wasDisabled) {
+          await secure.set(PUSH_OPT_OUT_KEY,"1");
+          await gateFor(api).run(()=>api.request("push/devices","DELETE").then(()=>{}),true).catch(()=>{});
+        }
+        throw error;
+      }
+    },
+    deactivate: async () => {
+      // Persist opt-out before waiting for in-flight auto registrations.
+      // Explicit unregistration wins against the foreground listener.
+      await secure.set(PUSH_OPT_OUT_KEY,"1");
+      try {
+        await gateFor(api).run(async () => {
+          await api.request("push/devices","DELETE");
+        },true);
+        refreshInbox();
+      } catch (error) {
+        await secure.remove(PUSH_OPT_OUT_KEY).catch(()=>{});
+        throw error;
+      }
     },
   };
 }
