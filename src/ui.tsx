@@ -784,30 +784,76 @@ export function Quantity({
   onChange,
   min = 0,
   max = 30,
+  variant = "plain",
+  collapseWhenZero = false,
+  label = "item",
 }: {
   value: number;
   onChange: (n: number) => void;
   min?: number;
   max?: number;
+  variant?: "plain" | "boxed";
+  collapseWhenZero?: boolean;
+  label?: string;
 }) {
-  return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 15 }}>
+  const boxed = variant === "boxed";
+  if (collapseWhenZero && value === 0) {
+    return (
       <Pressable
-        accessibilityLabel="Diminuir quantidade"
+        accessibilityRole="button"
+        accessibilityLabel={"Adicionar " + label}
+        accessibilityState={{ disabled: max <= 0 }}
+        disabled={max <= 0}
+        onPress={() => onChange(1)}
+        style={{
+          width: 44, height: 44, alignItems: "center", justifyContent: "center",
+          borderRadius: 22, backgroundColor: "#FFF7E8",
+          borderWidth: 1, borderColor: colors.line,
+          opacity: max <= 0 ? 0.35 : 1,
+        }}
+      >
+        <Plus size={23} color={colors.ink} />
+      </Pressable>
+    );
+  }
+  return (
+    <View style={{
+      flexDirection: "row", alignItems: "center", gap: boxed ? 6 : 15,
+      ...(boxed ? {
+        backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line,
+        borderRadius: 15, padding: 4,
+      } : {}),
+    }}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={"Diminuir quantidade de " + label}
         accessibilityState={{ disabled: value <= min }}
         disabled={value <= min}
-        hitSlop={10}
+        hitSlop={6}
         onPress={() => onChange(value - 1)}
+        style={boxed ? {
+          width: 37, height: 37, borderRadius: 12,
+          alignItems: "center", justifyContent: "center",
+          backgroundColor: "#F5F4F1", opacity: value <= min ? 0.4 : 1,
+        } : undefined}
       >
         <Minus size={20} color={colors.ink} />
       </Pressable>
-      <T bold>{value}</T>
+      <T bold style={boxed ? { minWidth: 19, textAlign: "center", fontSize: 15 } : undefined}>
+        {value}
+      </T>
       <Pressable
-        accessibilityLabel="Aumentar quantidade"
+        accessibilityRole="button"
+        accessibilityLabel={"Aumentar quantidade de " + label}
         accessibilityState={{ disabled: value >= max }}
         disabled={value >= max}
-        hitSlop={10}
+        hitSlop={6}
         onPress={() => onChange(value + 1)}
+        style={boxed ? {
+          width: 37, height: 37, borderRadius: 12,
+          alignItems: "center", justifyContent: "center",
+          backgroundColor: "#F5F4F1", opacity: value >= max ? 0.4 : 1,
+        } : undefined}
       >
         <Plus size={20} color={colors.ink} />
       </Pressable>

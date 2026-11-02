@@ -33,6 +33,7 @@ import {
   Heart,
   Store,
   Truck,
+  Plus,
 } from "lucide-react-native";
 import { useAuth } from "../auth";
 import { useMarket } from "../market";
@@ -61,6 +62,8 @@ import {
   previewExtrasTotal,
   selectionBounds,
   changeOptionSelection,
+  optionSelectionMax,
+  selectedOptions,
   unitPrice,
   type Selection,
 } from "../domain/orders";
@@ -1189,6 +1192,12 @@ export function ProductDetail() {
     [error, setError] = useState("");
   let extra = 0;
   try { extra = previewExtrasTotal(p?.option_groups ?? [], choices); } catch {}
+  let selectionError = "";
+  if (p) {
+    try { selectedOptions(p.option_groups ?? [], choices); }
+    catch (e) { selectionError = (e as Error).message; }
+  }
+  const canAdd = purchasable && maximumToAdd > 0 && qty <= maximumToAdd && !selectionError;
   return (
     <Screen title="Produto" back>
       <ErrorBox message={r.error || error} />
@@ -1219,40 +1228,70 @@ export function ProductDetail() {
           <View pointerEvents={purchasable?"auto":"none"} style={{gap:14,opacity:purchasable?1:0.5}}>
           {p.option_groups?.map((group) => {
             const chosen = choices[group.id] ?? [];
-            const {min,max} = selectionBounds(group);
-            return <Card key={group.id}>
-              <T bold>{group.name} · {min>0?"Obrigatório":"Opcional"}</T>
-              <T style={{fontSize:12,color:colors.muted}}>
-                {group.multiple?"Várias escolhas":"Escolha uma"} · {chosen.length}/{max} selecionado(s){min>1?" · mínimo "+min:""}
-              </T>
-              {group.options.map((o) => {
-                const count=chosen.filter(id=>id===o.id).length;
-                const available=o.available!==false;
-                return group.multiple&&group.allow_quantity?
-                  <View key={o.id} style={{flexDirection:"row",justifyContent:"space-between",alignItems:"center",paddingVertical:10,gap:10,opacity:available?1:0.5}}>
-                    <View style={{flex:1,gap:3}}>
-                      <T>{o.name}{available?"":" · Indisponível"}</T>
-                      <T style={{fontSize:12,color:colors.muted}}>{o.price_cents?"+"+money(o.price_cents)+" por unidade":"Incluso"}</T>
-                    </View>
-                    <Quantity min={0} value={count}
-                      max={available?count+Math.max(0,max-chosen.length):0}
-                      onChange={next=>setChoices(old=>({...old,
-                        [group.id]:changeOptionSelection(group,old[group.id]??[],o.id,next>count?1:-1)
-                      }))}/>
-                  </View>:
-                  <Pressable key={o.id} disabled={!available} accessibilityRole={group.multiple?"checkbox":"radio"}
-                    accessibilityState={{checked:count>0,disabled:!available}}
-                    onPress={()=>setChoices(old=>({...old,
-                      [group.id]:changeOptionSelection(group,old[group.id]??[],o.id,1)
-                    }))}
-                    style={{flexDirection:"row",justifyContent:"space-between",gap:12,paddingVertical:9,opacity:available?1:0.45}}>
-                    <T style={{flex:1}}>{count>0?"●":"○"} {o.name}{available?"":" · Indisponível"}</T>
-                    <T>{o.price_cents?"+"+money(o.price_cents):"Incluso"}</T>
-                  </Pressable>;
-              })}
-              {!group.multiple&&!group.required&&chosen.length>0&&
-                <Button title="Limpar escolha" secondary onPress={()=>setChoices(old=>({...old,[group.id]:[]}))}/>}
-            </Card>;
+            const { min, max } = selectionBounds(group);
+            return (
+              <View key={group.id} style={{
+                borderRadius: 20, overflow: "hidden",
+                borderWidth: 1, borderColor: colors.line,
+                backgroundColor: colors.card,
+              }}>
+                <View style={{ backgroundColor: "#F0EFEC", padding: 16, gap: 6 }}>
+                  <T bold style={{ fontSize: 18, lineHeight: 24 }}>
+                    {group.name} · {min > 0 ? "Obrigatório" : "Opcional"}
+                  </T>
+                  <T style={{ color: colors.muted, fontSize: 12 }}>
+                    {group.multiple ? "Várias escolhas" : "Escolha uma"} · {chosen.length}/{max} selecionado(s)
+                    {min > 1 ? " · mínimo " + min : ""}
+                  </T>
+                </View>
+                <View style={{ paddingHorizontal: 16 }}>
+                  {group.options.map((o, index) => {
+                    const count = chosen.filter(id => id === o.id).length;
+                    const available = o.available !== false;
+                    return (
+                      <View key={o.id} style={{
+                        flexDirection: "row", alignItems: "center",
+                        paddingVertical: 18, gap: 10,
+                        borderBottomWidth: index < group.options.length - 1 ? 1 : 0,
+                        borderBottomColor: colors.line,
+                      }}>
+                        <View style={{ flex: 1, minWidth: 0, gap: 4, opacity: available ? 1 : 0.5 }}>
+                          <T bold style={{ fontSize: 15, lineHeight: 21 }}>
+                            {"Adicionar " + o.name}
+                          </T>
+                          <T style={{ color: colors.muted, fontSize: 13 }}>
+                            {available ? (o.price_cents ? "+ " + money(o.price_cents) : "Incluso") : "Indisponível"}
+                          </T>
+                        </View>
+                        <Quantity
+                          variant="boxed"
+                          collapseWhenZero
+                          label={o.name}
+                          value={count}
+                          min={0}
+                          max={optionSelectionMax(group, chosen, o.id)}
+                          onChange={(next) => setChoices(old => ({
+                            ...old,
+                            [group.id]: changeOptionSelection(
+                              group, old[group.id] ?? [], o.id, next > count ? 1 : -1,
+                            ),
+                          }))}
+                        />
+                      </View>
+                    );
+                  })}
+                </View>
+                {!group.multiple && !group.required && chosen.length > 0 && (
+                  <View style={{ padding: 12 }}>
+                    <Button
+                      title="Limpar escolha"
+                      secondary
+                      onPress={() => setChoices(old => ({ ...old, [group.id]: [] }))}
+                    />
+                  </View>
+                )}
+              </View>
+            );
           })}
           <Field
             label="Observações do item"
@@ -1261,29 +1300,52 @@ export function ProductDetail() {
             multiline
             maxLength={200}
           />
-          <Quantity
-            value={qty}
-            min={1}
-            max={maximumToAdd}
-            onChange={(n) => setQty(Math.max(1, Math.min(Math.max(1,maximumToAdd), n)))}
-          />
-          {remaining!==null&&<T style={{fontSize:12,color:colors.muted}}>{remaining===0
-            ?"Você já atingiu o estoque disponível deste produto no carrinho."
-            :"Disponível para adicionar: "+remaining+" unidade(s)."}</T>}
-          <Button
-            title={
-              "Adicionar ao carrinho · " + money((unitPrice(p) + extra) * qty)
-            }
-            disabled={!purchasable||maximumToAdd===0||qty>maximumToAdd}
-            onPress={() => {
-              void market
-                .add(p, shop, qty, note, choices)
-                .then((added) => {
-                  if (added) router.push("/carrinho");
-                })
-                .catch((e) => setError(e.message));
-            }}
-          />
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <Quantity
+              variant="boxed"
+              value={qty}
+              min={1}
+              max={maximumToAdd}
+              label={p.name}
+              onChange={(n) => setQty(Math.max(1, Math.min(Math.max(1, maximumToAdd), n)))}
+            />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={"Adicionar ao carrinho por " + money((unitPrice(p) + extra) * qty)}
+              accessibilityState={{ disabled: !canAdd }}
+              disabled={!canAdd}
+              style={{
+                flex: 1, minWidth: 0, minHeight: 51, borderRadius: 999,
+                backgroundColor: colors.yellow, flexDirection: "row",
+                alignItems: "center", justifyContent: "center",
+                gap: 6, paddingHorizontal: 9, opacity: canAdd ? 1 : 0.5,
+              }}
+              onPress={() => {
+                setError("");
+                void market
+                  .add(p, shop, qty, note, choices)
+                  .then((added) => {
+                    if (added) router.push("/carrinho");
+                  })
+                  .catch((e) => setError(e.message));
+              }}
+            >
+              <Plus size={19} color={colors.ink} />
+              <T bold numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 14 }}>
+                {"Adicionar · " + money((unitPrice(p) + extra) * qty)}
+              </T>
+            </Pressable>
+          </View>
+          {!!selectionError && (
+            <T style={{ fontSize: 12, color: colors.muted }}>{selectionError}</T>
+          )}
+          {remaining !== null && (
+            <T style={{ fontSize: 12, color: colors.muted }}>
+              {remaining === 0
+                ? "Você já atingiu o estoque disponível deste produto no carrinho."
+                : "Disponível para adicionar: " + remaining + " unidade(s)."}
+            </T>
+          )}
           </View>
           <Button
             title="Denunciar produto"

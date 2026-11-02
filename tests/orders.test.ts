@@ -12,6 +12,7 @@ import {
   toggleArrivalInstruction,
   validArrivalInstructions,
   changeOptionSelection,
+  optionSelectionMax,
   previewExtrasTotal,
 } from "../src/domain/orders";
 
@@ -203,4 +204,46 @@ test('advanced groups enforce minimum, maximum, quantity extras and availability
   assert.throws(()=>selectedOptions(unavailable,{[extras]:[cheese]}),/não está mais disponível/);
   assert.equal(changeOptionSelection(unavailable[0],[],cheese,1).length,0);
   assert.equal(previewExtrasTotal(cfg,{[extras]:[cheese,cheese]}),600);
+});
+
+test("addon steppers respect shared maximum and allow removing unavailable choices", () => {
+  const group = optionGroupsSchema.parse([{
+    id: "22222222-2222-4222-8222-222222222222",
+    name: "Acompanhamentos", required: true, multiple: true,
+    min_select: 1, max_select: 5, allow_quantity: true,
+    options: [
+      { id: "33333333-3333-4333-8333-333333333333", name: "Granola", price_cents: 0 },
+      { id: "44444444-4444-4444-8444-444444444444", name: "Banana", price_cents: 200 },
+    ],
+  }])[0];
+  const granola = group.options[0].id, banana = group.options[1].id;
+  let chosen = [granola, granola, banana, banana];
+  assert.equal(optionSelectionMax(group, chosen, granola), 3);
+  chosen = changeOptionSelection(group, chosen, granola, 1);
+  assert.equal(chosen.length, 5);
+  assert.equal(optionSelectionMax(group, chosen, banana), 2);
+  assert.deepEqual(changeOptionSelection(group, chosen, banana, 1), chosen);
+  assert.equal(previewExtrasTotal([group], { [group.id]: chosen }), 400);
+  assert.equal(selectedOptions([group], { [group.id]: chosen }).length, 2);
+  const disabled = { ...group, options: [
+    { ...group.options[0], available: false }, group.options[1],
+  ] };
+  assert.equal(optionSelectionMax(disabled, [granola], granola), 1);
+  assert.deepEqual(changeOptionSelection(disabled, [granola], granola, -1), []);
+  assert.equal(optionSelectionMax(disabled, [], granola), 0);
+});
+
+test("single and non-quantity choices are capped at one", () => {
+  const ids = ["33333333-3333-4333-8333-333333333333", "44444444-4444-4444-8444-444444444444"];
+  const single = optionGroupsSchema.parse([{
+    id: "22222222-2222-4222-8222-222222222222",
+    name: "Tamanho", required: true, multiple: false,
+    options: ids.map(id => ({ id, name: "Opção", price_cents: 0 })),
+  }])[0];
+  assert.equal(optionSelectionMax(single, [ids[0]], ids[1]), 1);
+  assert.deepEqual(changeOptionSelection(single, [ids[0]], ids[1], 1), [ids[1]]);
+  assert.throws(() => selectedOptions([single], {}), /Selecione/);
+  const checkboxes = { ...single, multiple: true, required: false, max_select: 1 };
+  assert.equal(optionSelectionMax(checkboxes, [ids[0]], ids[1]), 0);
+  assert.equal(optionSelectionMax(checkboxes, [ids[0]], ids[0]), 1);
 });
