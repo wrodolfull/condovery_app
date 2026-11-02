@@ -15,7 +15,10 @@ test("header badge fetches unread notices even without permission to send push",
 test("foreground push and opening notices refresh unread count",()=>{
   const push=read("src/push.ts");
   assert.match(push,/addNotificationReceivedListener/);
-  assert.match(push,/invalidateQueries\(\{queryKey:\["push\/summary"\]\}\)/);
+  assert.match(push,/startsWith\("push\/summary"\)/);
+  assert.match(push,/PUSH_OPT_OUT_KEY/);
+  assert.match(push,/deactivate: async/);
+  assert.match(push,/push\/devices","DELETE"/);
   const screen=read("src/screens/AccountScreens.tsx");
   assert.match(screen,/push\/status/);
   assert.match(screen,/useFocusEffect/);
