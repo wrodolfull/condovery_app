@@ -338,7 +338,7 @@ for (const width of [360, 390, 430]) {
       page.getByText("Preparado pelo vizinho.", { exact: true }),
     ).toBeVisible();
     await checkNav(page);
-    await page.getByRole("button", { name: /Adicionar ao carrinho por R\\$/ }).click();
+    await page.getByRole("button", { name: /Adicionar ao carrinho por/ }).click();
     await expect(
       page.getByText("Seu pedido · Loja do Vizinho", { exact: true }),
     ).toBeVisible();
