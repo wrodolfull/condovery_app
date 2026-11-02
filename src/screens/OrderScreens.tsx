@@ -236,15 +236,15 @@ export function Checkout() {
         </Card>
       )}
       {shopClosed&&!cart.pending&&<Button title="Esvaziar carrinho" secondary onPress={()=>market.clear()}/>}
-      <View style={{opacity:blocked?0.55:1}} pointerEvents={blocked?"none":"auto"}>
+      <View style={{opacity:blocked?0.55:1,gap:14}} pointerEvents={blocked?"none":"auto"}>
       {cart.items.map((i, index) => (
-        <Card key={i.key}>
+        <Card key={i.key} style={{gap:12}}>
           <T bold>{i.product.name}</T>
           {i.product.option_groups?.flatMap(group=>group.options.flatMap(option=>{
             const count=(i.selections[group.id]??[]).filter(id=>id===option.id).length;
             return count?[group.name+": "+(count>1?count+"x ":"")+option.name]:[];
           })).map((description,j)=><T key={j} style={{fontSize:12,color:colors.muted}}>{description}</T>)}
-          <T>{i.note}</T>
+          {!!i.note && <T>{i.note}</T>}
           <T>
             {money(
               activeQuote?.lines[index]?.total_cents ??
@@ -423,6 +423,7 @@ export function Checkout() {
           <T style={{ color: colors.muted, fontSize: 12 }}>
             O pagamento será combinado diretamente com a loja.
           </T>
+          <View style={{gap:12}}>
           {accepted.map((m) => (
             <Pressable
               key={m}
@@ -445,6 +446,7 @@ export function Checkout() {
               <T bold>{PAYMENT_LABELS[m]}</T>
             </Pressable>
           ))}
+          </View>
         </>
       )}
       </View>
