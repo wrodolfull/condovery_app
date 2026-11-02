@@ -309,6 +309,36 @@ test("seller shortcut replaces the condominium label and opens store creation", 
   expect(errors).toEqual([]);
 });
 
+test("inbox loads ten notices at a time and hides push diagnostics",async({page})=>{
+  const {errors}=await enter(page);
+  const notices=Array.from({length:12},(_,i)=>({
+    id:String(i+1).padStart(8,"0")+"-2222-4333-8444-555555555555",
+    kind:"order",title:"Aviso "+i,body:"Mensagem de teste",target_id:null,
+    read_at:null,created_at:"2026-11-02T15:00:00Z"
+  }));
+  await page.route(/\/api\/push\/inbox\?/,async route=>{
+    const u=new URL(route.request().url());
+    const pageIndex=Number(u.searchParams.get("page")??0);
+    const limit=Number(u.searchParams.get("limit")??10);
+    await route.fulfill({json:{
+      notifications:notices.slice(pageIndex*limit,(pageIndex+1)*limit),
+      hasMore:(pageIndex+1)*limit<notices.length
+    },headers:{"Access-Control-Allow-Origin":"*"}});
+  });
+  await page.getByRole("button",{name:"Notificações",exact:true}).click();
+  await expect(page.getByText("Aviso 0",{exact:true})).toBeVisible();
+  await expect(page.getByText(/^Aviso \d+$/)).toHaveCount(10);
+  await page.getByRole("button",{name:"Mostrar mais"}).click();
+  await expect(page.getByText(/^Aviso \d+$/)).toHaveCount(12);
+  await expect(page.getByRole("button",{name:"Limpar tudo"})).toBeVisible();
+  await page.getByRole("button",{name:"Preferências de notificações"}).last().click();
+  await expect(page.getByText("Fique por dentro da vizinhança")).toBeVisible();
+  await expect(page.getByText("Diagnóstico de notificações")).toHaveCount(0);
+  await expect(page.getByText(/Aparelho registrado/)).toHaveCount(0);
+  await expect(page.getByRole("button",{name:"Desativar notificações neste aparelho"})).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test("notification icon shows an unread badge when the server reports new notices", async ({page})=>{
   const {errors}=await enter(page,true,true,false,false,2);
   await expect(page.getByLabel("2 notificações não lidas")).toBeVisible();
