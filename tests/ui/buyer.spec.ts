@@ -301,7 +301,7 @@ test("seller shortcut replaces the condominium label and opens store creation", 
   const {errors}=await enter(page);
   await expect(page.getByText("Você está em", {exact:true})).toHaveCount(0);
   await expect(page.getByText("Condomínio de Teste", {exact:true})).toHaveCount(0);
-  const shortcut=page.getByRole("button",{name:"Minha loja / Quero vender",exact:true});
+  const shortcut=page.getByRole("button",{name:"Acessar minha loja",exact:true});
   await expect(shortcut).toBeVisible();
   await shortcut.click();
   await expect(page.getByText("Comece a vender",{exact:true})).toBeVisible();
