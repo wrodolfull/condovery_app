@@ -2,7 +2,8 @@ import { quoteChanged } from "../domain/quote";
 import {canDiscardCheckoutAttempt,shouldCheckShopAvailability} from "../domain/checkout-recovery";
 import { dateForApi, formatPreferredDate } from "../domain/date";
 import React, { useRef, useState } from "react";
-import { FlatList, Pressable, View, useWindowDimensions } from "react-native";
+import { FlatList, Pressable, ScrollView, View, useWindowDimensions } from "react-native";
+import { Plus } from "lucide-react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { randomUUID } from "expo-crypto";
 import { useAuth } from "../auth";
@@ -16,6 +17,7 @@ import {
   ErrorBox,
   Field,
   Loading,
+  Picture,
   Quantity,
   Screen,
   T,
@@ -25,6 +27,7 @@ import { colors, money } from "../theme";
 import {
   arrivalInstructionOptions,
   toggleArrivalInstruction,
+  unitPrice,
 } from "../domain/orders";
 import {
   allowedPaymentMethods,
@@ -34,6 +37,7 @@ import {
 import { openWhatsApp } from "../external";
 import { statusLabels, type Order, type Quote, type Product } from "../types";
 import {maxLineQuantity} from "../domain/cart-stock";
+import {recommendStoreProducts} from "../domain/cart-recommendations";
 import { useFocusedOrderRefresh } from "../useFocusedOrderRefresh";
 import { orderNeedsLiveRefresh } from "../domain/order-refresh";
 import { orderHistoryPath, type OrdersPage } from "../domain/order-pagination";
@@ -45,6 +49,9 @@ export function Checkout() {
   // Cart data may have been saved before the seller closed their store.
   const liveShop = useResource<{shop: typeof shop;products:Product[]}>(shop ? "shops/" + shop.id : null);
   const shopClosed = shop?.is_open===false || liveShop.data?.shop?.is_open===false;
+  const recommendations = shop && !shopClosed && !cart.pending
+    ? recommendStoreProducts(liveShop.data?.products ?? [], shop.id, cart.items)
+    : [];
   const stockFor=(product:Product)=>{
     const fresh=liveShop.data?.products.find(p=>p.id===product.id);
     return fresh?fresh.stock:product.stock;
@@ -260,6 +267,77 @@ export function Checkout() {
           )}
         </Card>
       ))}
+      {!cart.pending && (
+        <View style={{ gap: 16 }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={"Adicionar mais itens da loja " + shop.name}
+            onPress={() => router.push({
+              pathname: "/loja/[id]",
+              params: { id: shop.id },
+            })}
+            style={{
+              minHeight: 55, borderRadius: 16,
+              backgroundColor: "#EFEFEC",
+              alignItems: "center", justifyContent: "center",
+              paddingHorizontal: 16,
+            }}
+          >
+            <T bold style={{ fontSize: 15 }}>Adicionar mais itens</T>
+          </Pressable>
+          {recommendations.length > 0 && (
+            <>
+              <T heading style={{ fontSize: 22 }}>Peça também</T>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                accessibilityLabel="Sugestões de produtos da mesma loja"
+                contentContainerStyle={{ gap: 12, paddingRight: 8, paddingBottom: 4 }}
+              >
+                {recommendations.map(product => (
+                  <Pressable
+                    key={product.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={"Ver " + product.name + " para adicionar"}
+                    onPress={() => router.push({
+                      pathname: "/produto/[shop]/[id]",
+                      params: { shop: shop.id, id: product.id },
+                    })}
+                    style={{ width: 135, gap: 7 }}
+                  >
+                    <View>
+                      <Picture
+                        path={product.image_url}
+                        label={product.name}
+                        aspectRatio={1}
+                        radius={13}
+                      />
+                      <View pointerEvents="none" style={{
+                        position: "absolute", right: 6, bottom: 6,
+                        width: 39, height: 39, borderRadius: 20,
+                        alignItems: "center", justifyContent: "center",
+                        backgroundColor: colors.yellow,
+                        borderWidth: 2, borderColor: colors.card,
+                      }}>
+                        <Plus size={22} color={colors.ink} />
+                      </View>
+                    </View>
+                    <T bold style={{ fontSize: 14 }}>{money(unitPrice(product))}</T>
+                    <T numberOfLines={2} style={{ fontSize: 13, lineHeight: 19 }}>
+                      {product.name}
+                    </T>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </>
+          )}
+          {!liveShop.loading && !liveShop.error && !recommendations.length && (
+            <T style={{ fontSize: 12, color: colors.muted }}>
+              Não há outros produtos disponíveis nesta loja no momento.
+            </T>
+          )}
+        </View>
+      )}
       {!cart.pending && (
         <>
           <T heading style={{ fontSize: 21 }}>
