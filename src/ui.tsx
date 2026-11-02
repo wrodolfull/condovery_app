@@ -260,7 +260,7 @@ export function Screen({
           <View style={{ flexDirection: "row", gap: 5 }}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Minha loja / Quero vender"
+              accessibilityLabel="Acessar minha loja"
               onPress={() => router.navigate("/vendedor")}
               style={s.headerAction}
             >
