@@ -95,12 +95,12 @@ export default function SellerPanel() {
     ? [focusItem,...orders.filter(o=>o.id!==focusItem.id)]
     : orders;
   const orderCounts=sellerOrderCounts(visibleOrders);
-  const filteredSellerOrders=sellerOrdersInSection(visibleOrders,sellerOrderView);
-  useEffect(()=>{
-    if(!focusedOrderId||!focusItem||focusItem.id!==focusedOrderId)return;
-    setSellerOrderView(sellerOrderSection(focusItem.status));
-    setExpandedSellerOrderId(focusItem.id);
-  },[focusedOrderId,focusItem?.id,focusItem?.status]);
+  // A notification deep-link initially opens its target's correct stage,
+  // but manual tab selection remains in control afterwards.
+  const activeSellerOrderView=focusedOrderId&&focusItem?.id===focusedOrderId&&
+    expandedSellerOrderId===focusedOrderId
+    ?sellerOrderSection(focusItem.status):sellerOrderView;
+  const filteredSellerOrders=sellerOrdersInSection(visibleOrders,activeSellerOrderView);
   const [ordersCursor,setOrdersCursor]=useState<string|null>(null);
   const [loadingOlder,setLoadingOlder]=useState(false);
   const historyLoaded=useRef(false);
@@ -374,20 +374,20 @@ export default function SellerPanel() {
           contentContainerStyle={{gap:8,paddingVertical:3}}>
           {sellerOrderSections.map(section=>
             <Pressable key={section.key} accessibilityRole="button"
-              accessibilityState={{selected:sellerOrderView===section.key}}
+              accessibilityState={{selected:activeSellerOrderView===section.key}}
               accessibilityLabel={section.label+" ("+orderCounts[section.key]+")"}
               onPress={()=>{setSellerOrderView(section.key);setExpandedSellerOrderId(null);}}
               style={{
                 paddingHorizontal:15,paddingVertical:11,borderRadius:16,
                 flexDirection:"row",alignItems:"center",gap:8,
-                backgroundColor:sellerOrderView===section.key?colors.ink:"#EEEAE3",
+                backgroundColor:activeSellerOrderView===section.key?colors.ink:"#EEEAE3",
               }}>
-              <T bold style={{fontSize:13,color:sellerOrderView===section.key?"white":colors.ink}}>{section.label}</T>
+              <T bold style={{fontSize:13,color:activeSellerOrderView===section.key?"white":colors.ink}}>{section.label}</T>
               <View style={{
                 borderRadius:99,paddingHorizontal:7,paddingVertical:2,
-                backgroundColor:sellerOrderView===section.key?"#484943":"#FFFFFF",
+                backgroundColor:activeSellerOrderView===section.key?"#484943":"#FFFFFF",
               }}>
-                <T bold style={{fontSize:12,color:sellerOrderView===section.key?"white":colors.ink}}>
+                <T bold style={{fontSize:12,color:activeSellerOrderView===section.key?"white":colors.ink}}>
                   {orderCounts[section.key]}
                 </T>
               </View>
@@ -398,7 +398,7 @@ export default function SellerPanel() {
         {ordersLoading&&!lastOrdersUpdate?<Loading/>:
           !ordersError&&!filteredSellerOrders.length?
             <Empty title="Nenhum pedido nesta etapa"
-              body={sellerOrderView==="new"?"Os novos pedidos aparecerão aqui.":sellerOrderView==="ongoing"?"Os pedidos confirmados aparecerão aqui.":"Pedidos concluídos e cancelados aparecerão aqui."}/>:
+              body={activeSellerOrderView==="new"?"Os novos pedidos aparecerão aqui.":activeSellerOrderView==="ongoing"?"Os pedidos confirmados aparecerão aqui.":"Pedidos concluídos e cancelados aparecerão aqui."}/>:
           filteredSellerOrders.map(o=>{
             const expanded=expandedSellerOrderId===o.id;
             return <View key={o.id}
