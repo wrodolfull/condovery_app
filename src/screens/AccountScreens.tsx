@@ -575,7 +575,7 @@ export function NoticeDetail() {
     void api.request("push/inbox/" + id, "PATCH")
       .then(async()=>{
         await Promise.all([
-          queryClient.invalidateQueries({queryKey:["push/summary"]}),
+          queryClient.invalidateQueries({predicate:q=>typeof q.queryKey[2]==="string"&&q.queryKey[2].startsWith("push/summary")}),
           queryClient.invalidateQueries({predicate:q=>
             typeof q.queryKey[2]==="string"&&q.queryKey[2].startsWith("push/inbox?")
           }),
