@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Modal, Pressable, Switch, View } from "react-native";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Bell, ChevronRight, CircleHelp, Gift, LogOut, Receipt,
   Settings, ShieldCheck, Store, Trash2,
@@ -411,171 +411,157 @@ export function DeleteAccount() {
 type PushPreferences = {
   condominium: boolean;
   orders: boolean;
-  seller_orders: boolean;
-};
-export function Preferences() {
-  const { api } = useAuth();
-  const push = usePush(false);
-  const r = useResource<{ preferences: PushPreferences; is_seller: boolean }>(
-    "push/preferences",
-  );
-  const status = useResource<{ registered_devices: number; transport_enabled: boolean; provider_configured: boolean }>("push/status");
-  const [busy, setBusy] = useState(false),
-    [message, setMessage] = useState("");
+  seller_orexport function Preferences() {
+  const {api}=useAuth();
+  const push=usePush(false);
+  const r=useResource<{preferences:PushPreferences;is_seller:boolean}>("push/preferences");
+  // Scoped to this authenticated mobile session, not other family devices.
+  const status=useResource<{registered_devices:number}>("push/status");
+  const [busy,setBusy]=useState(false);
+  const active=(status.data?.registered_devices??0)>0;
+  const toggleDevice=async()=>{
+    if(busy)return;
+    setBusy(true);
+    try {
+      if(active) await push.deactivate();
+      else await push.activate();
+      await status.reload();
+    }catch(e){alertError(e);}
+    finally{setBusy(false);}
+  };
   return (
     <Screen title="Notificações" back>
-      <T heading style={{ fontSize: 26 }}>
-        Fique por dentro da vizinhança
-      </T>
-      <T>
-        Escolha quais avisos você deseja receber no aparelho. Os avisos também
-        ficam disponíveis na sua conta.
-      </T>
+      <T heading style={{fontSize:26}}>Fique por dentro da vizinhança</T>
+      <T>Escolha quais avisos você deseja receber no aparelho. Os avisos também ficam disponíveis na sua conta.</T>
       <Button
-        title="Ativar notificações neste aparelho"
+        title={active?"Desativar notificações neste aparelho":"Ativar notificações neste aparelho"}
         busy={busy}
-        onPress={() => {
-          setBusy(true);
-          push
-            .activate()
-            .then(async () => {
-              const latest = await status.reload();
-              if (!latest?.registered_devices)
-                throw new Error("A permissão foi autorizada, mas este aparelho não está registrado no servidor.");
-              setMessage(
-                latest.transport_enabled && latest.provider_configured
-                  ? "Aparelho registrado. As notificações dependem também do envio pelo servidor."
-                  : "Aparelho registrado, mas o envio push ainda precisa ser habilitado ou configurado no servidor.",
-              );
-            })
-            .catch(alertError)
-            .finally(() => setBusy(false));
-        }}
+        onPress={()=>void toggleDevice()}
       />
-      {message && <T style={{ color: colors.green }}>{message}</T>}
-      <Card style={{gap:6}}>
-        <T bold>Diagnóstico de notificações</T>
-        {status.loading && <T style={{color:colors.muted}}>Verificando registro...</T>}
-        {!!status.error && <T style={{color:colors.muted}}>Não foi possível consultar o status: {status.error}</T>}
-        {status.data && <>
-          <T>Registro do aparelho: {status.data.registered_devices>0?"Ativo":"Não registrado"}</T>
-          <T>Envio pelo servidor: {status.data.transport_enabled?"Habilitado":"Desativado"}</T>
-          <T>Credenciais de envio: {status.data.provider_configured?"Configuradas":"Pendentes"}</T>
-          <T style={{fontSize:12,color:colors.muted}}>
-            O envio também exige um worker ativo e credenciais FCM válidas; essas etapas não podem ser verificadas pelo app.
-          </T>
-        </>}
-      </Card>
-      <ErrorBox message={r.error} />
-      {r.loading && <Loading />}
-      {r.data &&
-        (
-          [
-            ["condominium", "Avisos do condomínio"],
-            ["orders", "Atualizações dos meus pedidos"],
-            ...(r.data.is_seller
-              ? [["seller_orders", "Pedidos, avaliações e pendências da minha loja"]]
-              : []),
-          ] as [keyof PushPreferences, string][]
-        ).map(([key, label]) => (
-          <Card
-            key={key}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
+      <ErrorBox message={r.error}/>
+      {r.loading&&<Loading/>}
+      {r.data&&(
+        [
+          ["condominium","Avisos do condomínio"],
+          ["orders","Atualizações dos meus pedidos"],
+          ...(r.data.is_seller?[["seller_orders","Pedidos, avaliações e pendências da minha loja"]]:[])
+        ] as [keyof PushPreferences,string][]
+      ).map(([key,label])=>(
+        <Card key={key} style={{
+          flexDirection:"row",alignItems:"center",justifyContent:"space-between"
+        }}>
+          <T style={{flex:1}}>{label}</T>
+          <Switch
+            accessibilityLabel={label}
+            value={r.data!.preferences[key]}
+            disabled={busy}
+            trackColor={{true:colors.orange}}
+            onValueChange={value=>{
+              setBusy(true);
+              api.request("push/preferences","PATCH",{
+                ...r.data!.preferences,[key]:value,
+              }).then(()=>r.reload()).catch(alertError).finally(()=>setBusy(false));
             }}
-          >
-            <T style={{ flex: 1 }}>{label}</T>
-            <Switch
-              accessibilityLabel={label}
-              value={r.data!.preferences[key]}
-              disabled={busy}
-              trackColor={{ true: colors.orange }}
-              onValueChange={(value) => {
-                setBusy(true);
-                api
-                  .request("push/preferences", "PATCH", {
-                    ...r.data!.preferences,
-                    [key]: value,
-                  })
-                  .then(() => r.reload())
-                  .catch(alertError)
-                  .finally(() => setBusy(false));
-              }}
-            />
-          </Card>
-        ))}
+          />
+        </Card>
+      ))}
     </Screen>
   );
 }
+
 export function Inbox() {
-  const openNotification = useOpenNotification();
-  const [page, setPage] = useState(0);
-  const {viewer}=useAuth();
+  const openNotification=useOpenNotification();
+  const {api,viewer}=useAuth();
   const queryClient=useQueryClient();
+  const [clearing,setClearing]=useState(false);
+  const key=[viewer?.id??"anonymous",viewer?.condominium_id??"","push/inbox?limit=10"];
+  const inbox=useInfiniteQuery<{notifications:Notice[];hasMore:boolean},Error>({
+    queryKey:key,
+    queryFn:({pageParam})=>api.request<{notifications:Notice[];hasMore:boolean}>(
+      "push/inbox?page="+pageParam+"&limit=10"
+    ),
+    initialPageParam:0,
+    getNextPageParam:(last,pages)=>last.hasMore?pages.length:undefined,
+    enabled:!!viewer,
+    staleTime:5000,
+    retry:false,
+  });
   useFocusEffect(useCallback(()=>{
-    // A remote notice may have been created while the app was in background,
-    // even if FCM is disabled. Always refresh the inbox on return.
-    void queryClient.invalidateQueries({predicate:q=>
-      q.queryKey[0]===viewer?.id && q.queryKey[1]===viewer?.condominium_id &&
-      typeof q.queryKey[2]==="string" && q.queryKey[2].startsWith("push/inbox?")
-    });
-  },[queryClient,viewer?.id,viewer?.condominium_id,page]));
-  const r = useResource<{ notifications: Notice[]; hasMore: boolean }>(
-    "push/inbox?page=" + page,
+    // Keep the inbox fresh without losing previously loaded pages.
+    void queryClient.invalidateQueries({queryKey:key});
+  },[queryClient,viewer?.id,viewer?.condominium_id]));
+  const items=inbox.data?.pages.flatMap(page=>page.notifications)??[];
+  const clearAll=()=>Alert.alert(
+    "Limpar notificações?",
+    "Todos os avisos desta conta, incluindo os não lidos, serão apagados. Esta ação não pode ser desfeita.",
+    [
+      {text:"Cancelar",style:"cancel"},
+      {text:"Limpar tudo",style:"destructive",onPress:()=>{
+        if(clearing)return;
+        setClearing(true);
+        void api.request("push/inbox","DELETE")
+          .then(async()=>{
+            await queryClient.resetQueries({queryKey:key,exact:true});
+            await queryClient.invalidateQueries({predicate:q=>
+              typeof q.queryKey[2]==="string"&&q.queryKey[2].startsWith("push/summary")
+            });
+          })
+          .catch(alertError)
+          .finally(()=>setClearing(false));
+      }},
+    ]
   );
-  const items = r.data?.notifications ?? [];
   return (
     <Screen title="Notificações" back>
-      <T heading style={{ fontSize: 27 }}>
-        Notificações
-      </T>
+      <View style={{flexDirection:"row",alignItems:"center",justifyContent:"space-between",gap:10}}>
+        <T heading style={{fontSize:27,flex:1}}>Notificações</T>
+        {items.length>0&&(
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Limpar tudo"
+            disabled={clearing}
+            onPress={clearAll}
+            style={{paddingVertical:12,paddingHorizontal:5,opacity:clearing?0.5:1}}
+          >
+            <T bold style={{color:colors.orange,fontSize:14}}>Limpar tudo</T>
+          </Pressable>
+        )}
+      </View>
       <ErrorBox
-        message={r.error}
-        retry={() => void r.reload().catch(() => {})}
+        message={inbox.error?.message??""}
+        retry={()=>void inbox.refetch()}
       />
-      {items.map((n) => (
-        <Pressable
-          key={n.id}
-          onPress={() => void openNotification(n).catch(alertError)}
-        >
-          <Card style={!n.read_at ? { borderColor: colors.orange } : undefined}>
+      {items.map(n=>(
+        <Pressable key={n.id} onPress={()=>void openNotification(n).catch(alertError)}>
+          <Card style={!n.read_at?{borderColor:colors.orange}:undefined}>
             <T bold>{n.title}</T>
             <T>{n.body}</T>
-            <T style={{ fontSize: 11, color: colors.muted }}>
-              {new Date(n.created_at).toLocaleString("pt-BR")}
-            </T>
+            <T style={{fontSize:11,color:colors.muted}}>{new Date(n.created_at).toLocaleString("pt-BR")}</T>
           </Card>
         </Pressable>
       ))}
-      {r.loading && <Loading />}
-      {!r.loading && !items.length && !r.error && (
-        <Empty
-          title="Tudo em dia por aqui"
-          body="Os avisos do condomínio e as atualizações de pedidos aparecerão aqui."
-        />
+      {inbox.isPending&&<Loading/>}
+      {!inbox.isPending&&!items.length&&!inbox.error&&(
+        <Empty title="Tudo em dia por aqui"
+          body="Os avisos do condomínio e as atualizações de pedidos aparecerão aqui."/>
       )}
-      {page > 0 && (
+      {inbox.hasNextPage&&(
         <Button
-          title="Avisos anteriores"
+          title="Mostrar mais"
           secondary
-          onPress={() => setPage((n) => n - 1)}
-        />
-      )}
-      {r.data?.hasMore && (
-        <Button
-          title="Próximos avisos"
-          secondary
-          onPress={() => setPage((n) => n + 1)}
+          busy={inbox.isFetchingNextPage}
+          onPress={()=>void inbox.fetchNextPage().catch(alertError)}
         />
       )}
       <Button
         title="Preferências de notificações"
         secondary
-        onPress={() => router.push("/preferencias")}
+        onPress={()=>router.push("/preferencias")}
       />
     </Screen>
+  );
+}
+ </Screen>
   );
 }
 export function NoticeDetail() {
