@@ -29,7 +29,6 @@ import {
   ChevronRight,
   Heart,
   Minus,
-  MapPin,
   ShoppingBasket,
   Search,
   X,
@@ -254,41 +253,19 @@ export function Screen({
             elevadoor<T style={{ fontSize: 27, color: colors.orange }}>.</T>
           </T>
         </Pressable>
-        <View
-          style={{
-            flex: 1,
-            minWidth: 0,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 5,
-          }}
-        >
-          {viewer ? (
-            <>
-              <MapPin size={17} color={colors.orange} />
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <T
-                  style={{ fontSize: 10, lineHeight: 14, color: colors.muted }}
-                >
-                  Você está em
-                </T>
-                <T
-                  bold
-                  numberOfLines={1}
-                  style={{ fontSize: 12, lineHeight: 16 }}
-                >
-                  {viewer.condominium_name}
-                </T>
-              </View>
-            </>
-          ) : (
-            <T heading style={{ fontSize: 18 }}>
-              {title}
-            </T>
-          )}
+        <View style={{ flex: 1, minWidth: 0 }}>
+          {!viewer && <T heading style={{ fontSize: 18 }}>{title}</T>}
         </View>
         {viewer && (
           <View style={{ flexDirection: "row", gap: 5 }}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Acessar minha loja"
+              onPress={() => router.navigate("/vendedor")}
+              style={s.headerAction}
+            >
+              <Store size={21} color={colors.ink} />
+            </Pressable>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Notificações"
