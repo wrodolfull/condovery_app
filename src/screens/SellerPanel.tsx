@@ -17,6 +17,7 @@ import {sellerDraftScope,parseSellerDraft,type ShopDraft} from "../domain/shop-d
 import {isCommercialProductCategory} from "../domain/category-purpose";
 import {loadSellerDraft,saveSellerDraft} from "../storage";
 import { mergeLatestOrders, orderHistoryPath, type OrdersPage } from "../domain/order-pagination";
+import {sellerOrderSections,sellerOrderCounts,sellerOrdersInSection,sellerOrderSection,type SellerOrderSection} from "../domain/seller-order-sections";
 import {DailySalesChart} from "../components/DailySalesChart";
 import type {DailySale} from "../domain/seller-insights";
 
@@ -86,11 +87,20 @@ export default function SellerPanel() {
   const [shop,setShop]=useState<Shop|null>(null);
   const [products,setProducts]=useState<Product[]>([]);
   const [orders,setOrders]=useState<Order[]>([]);
+  const [sellerOrderView,setSellerOrderView]=useState<SellerOrderSection>("new");
+  const [expandedSellerOrderId,setExpandedSellerOrderId]=useState<string|null>(focusedOrderId??null);
   // Prefer the freshest response after a seller changes status.
   const focusItem=orders.find(o=>o.id===focusedOrderId)??focusedOrder.data?.order;
   const visibleOrders=focusItem
     ? [focusItem,...orders.filter(o=>o.id!==focusItem.id)]
     : orders;
+  const orderCounts=sellerOrderCounts(visibleOrders);
+  const filteredSellerOrders=sellerOrdersInSection(visibleOrders,sellerOrderView);
+  useEffect(()=>{
+    if(!focusedOrderId||!focusItem||focusItem.id!==focusedOrderId)return;
+    setSellerOrderView(sellerOrderSection(focusItem.status));
+    setExpandedSellerOrderId(focusItem.id);
+  },[focusedOrderId,focusItem?.id,focusItem?.status]);
   const [ordersCursor,setOrdersCursor]=useState<string|null>(null);
   const [loadingOlder,setLoadingOlder]=useState(false);
   const historyLoaded=useRef(false);
@@ -359,41 +369,109 @@ export default function SellerPanel() {
           }}/>
         </View>
         {!!ordersError&&<ErrorBox message={"Não foi possível atualizar os pedidos: "+ordersError}/>}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}
+          accessibilityLabel="Etapas dos pedidos"
+          contentContainerStyle={{gap:8,paddingVertical:3}}>
+          {sellerOrderSections.map(section=>
+            <Pressable key={section.key} accessibilityRole="button"
+              accessibilityState={{selected:sellerOrderView===section.key}}
+              accessibilityLabel={section.label+" ("+orderCounts[section.key]+")"}
+              onPress={()=>{setSellerOrderView(section.key);setExpandedSellerOrderId(null);}}
+              style={{
+                paddingHorizontal:15,paddingVertical:11,borderRadius:16,
+                flexDirection:"row",alignItems:"center",gap:8,
+                backgroundColor:sellerOrderView===section.key?colors.ink:"#EEEAE3",
+              }}>
+              <T bold style={{fontSize:13,color:sellerOrderView===section.key?"white":colors.ink}}>{section.label}</T>
+              <View style={{
+                borderRadius:99,paddingHorizontal:7,paddingVertical:2,
+                backgroundColor:sellerOrderView===section.key?"#484943":"#FFFFFF",
+              }}>
+                <T bold style={{fontSize:12,color:sellerOrderView===section.key?"white":colors.ink}}>
+                  {orderCounts[section.key]}
+                </T>
+              </View>
+            </Pressable>
+          )}
+        </ScrollView>
+        <T style={{fontSize:11,color:colors.muted}}>Quantidades dos pedidos carregados.</T>
         {ordersLoading&&!lastOrdersUpdate?<Loading/>:
-          !ordersError&&!visibleOrders.length?<Empty title="Nenhum pedido recebido" body="Os pedidos da sua loja aparecerão aqui."/>:
-          visibleOrders.map(o=><View key={o.id} style={o.id===focusedOrderId?{...line,borderColor:colors.orange,borderWidth:2}:line}>
-            <T bold style={{fontSize:17}}>Pedido #{o.code}</T>
-            <T bold>{o.status==="awaiting_confirmation"?"Aguardando confirmação":o.status==="confirmed"?"Confirmado":o.status==="completed"?"Concluído":"Cancelado"}</T>
-            {sellerOrderDetails(o).map((detail,i)=><T key={"detail-"+i}>{detail}</T>)}
-            <T bold>Itens do pedido</T>
-            {o.items.map((item,i)=><View key={i} style={{gap:4,paddingVertical:7,borderTopWidth:1,borderColor:colors.line}}>
-              <T bold>{item.quantity} × {item.name} · {money(item.unit_price_cents*item.quantity)}</T>
-              {sellerItemDetails(item).map((detail,j)=><T key={j} style={{color:colors.muted}}>{detail}</T>)}
-            </View>)}
-            <View style={{borderTopWidth:1,borderColor:colors.line,paddingTop:9,gap:4}}>
-              <T>Subtotal: {money(o.subtotal_cents??o.total_cents)}</T>
-              {o.fulfillment==="delivery"&&<T>Taxa de entrega: {money(o.delivery_fee_cents??0)}</T>}
-              <T bold>Total: {money(o.total_cents)}</T>
-            </View>
-            {o.status==="awaiting_confirmation"&&<Button title="Confirmar pedido" busy={busy} onPress={()=>void run(async()=>{
-              await api.request("orders/"+o.id,"PATCH",{status:"confirmed"});
-              await refreshLatestOrders();
-              if (focusedOrderId===o.id) await focusedOrder.reload().catch(()=>{});
-            })}/>}
-            {o.status==="confirmed"&&<Button title="Concluir pedido" busy={busy} onPress={()=>void run(async()=>{
-              await api.request("orders/"+o.id,"PATCH",{status:"completed"});
-              await refreshLatestOrders();
-              if (focusedOrderId===o.id) await focusedOrder.reload().catch(()=>{});
-            })}/>}
-            {["awaiting_confirmation","confirmed"].includes(o.status)&&
-              <Button title="Cancelar pedido" secondary busy={busy} onPress={()=>Alert.alert("Cancelar pedido?","Esta ação altera o status do pedido.",[
-                {text:"Voltar",style:"cancel"},
-                {text:"Cancelar pedido",style:"destructive",onPress:()=>void run(async()=>{
-                  await api.request("orders/"+o.id,"PATCH",{status:"cancelled"});
+          !ordersError&&!filteredSellerOrders.length?
+            <Empty title="Nenhum pedido nesta etapa"
+              body={sellerOrderView==="new"?"Os novos pedidos aparecerão aqui.":sellerOrderView==="ongoing"?"Os pedidos confirmados aparecerão aqui.":"Pedidos concluídos e cancelados aparecerão aqui."}/>:
+          filteredSellerOrders.map(o=>{
+            const expanded=expandedSellerOrderId===o.id;
+            return <View key={o.id}
+              style={o.id===focusedOrderId?{...line,borderColor:colors.orange,borderWidth:2}:line}>
+              <Pressable accessibilityRole="button"
+                accessibilityLabel={(expanded?"Ocultar":"Ver")+" detalhes do pedido #"+o.code}
+                accessibilityState={{expanded}}
+                onPress={()=>setExpandedSellerOrderId(current=>current===o.id?null:o.id)}
+                style={{gap:9}}>
+                <View style={{flexDirection:"row",alignItems:"center",justifyContent:"space-between",gap:10}}>
+                  <T bold style={{fontSize:17}}>Pedido #{o.code}</T>
+                  <T bold style={{fontSize:12,color:o.status==="completed"?colors.green:colors.orange}}>
+                    {o.status==="awaiting_confirmation"?"Aguardando confirmação":o.status==="confirmed"?"Confirmado":o.status==="completed"?"Concluído":"Cancelado"}
+                  </T>
+                </View>
+                <T style={{color:colors.muted,fontSize:13}}>
+                  {(o.buyer_name||"Morador")+" · "+(o.fulfillment==="delivery"?o.tower+" · Ap. "+o.apartment:"Retirada")}
+                </T>
+                <T numberOfLines={2} style={{fontSize:14}}>
+                  {o.items.slice(0,2).map(item=>item.quantity+"× "+item.name).join(" · ")}
+                  {o.items.length>2?" · +"+(o.items.length-2)+" item(ns)":""}
+                </T>
+                <View style={{flexDirection:"row",justifyContent:"space-between",alignItems:"center",gap:10}}>
+                  <T style={{fontSize:11,color:colors.muted}}>
+                    {new Date(o.created_at).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}
+                  </T>
+                  <T bold style={{fontSize:17}}>{money(o.total_cents)}</T>
+                </View>
+                <T bold style={{fontSize:12,color:colors.orange}}>
+                  {expanded?"Ocultar detalhes":"Ver detalhes"}
+                </T>
+              </Pressable>
+              {o.status==="awaiting_confirmation"&&<Button
+                title="Confirmar pedido" busy={busy}
+                onPress={()=>void run(async()=>{
+                  await api.request("orders/"+o.id,"PATCH",{status:"confirmed"});
                   await refreshLatestOrders();
-                  if (focusedOrderId===o.id) await focusedOrder.reload().catch(()=>{});
-                })}])}/>}
-          </View>)}
+                  if(focusedOrderId===o.id)await focusedOrder.reload().catch(()=>{});
+                })}/>}
+              {o.status==="confirmed"&&<Button
+                title="Concluir pedido" busy={busy}
+                onPress={()=>void run(async()=>{
+                  await api.request("orders/"+o.id,"PATCH",{status:"completed"});
+                  await refreshLatestOrders();
+                  if(focusedOrderId===o.id)await focusedOrder.reload().catch(()=>{});
+                })}/>}
+              {expanded&&<View style={{gap:11,borderTopWidth:1,borderColor:colors.line,paddingTop:12}}>
+                {sellerOrderDetails(o).map((detail,i)=><T key={"detail-"+i}>{detail}</T>)}
+                <T bold>Itens do pedido</T>
+                {o.items.map((item,i)=><View key={i}
+                  style={{gap:4,paddingVertical:7,borderTopWidth:1,borderColor:colors.line}}>
+                  <T bold>{item.quantity} × {item.name} · {money(item.unit_price_cents*item.quantity)}</T>
+                  {sellerItemDetails(item).map((detail,j)=>
+                    <T key={j} style={{color:colors.muted}}>{detail}</T>)}
+                </View>)}
+                <View style={{borderTopWidth:1,borderColor:colors.line,paddingTop:9,gap:4}}>
+                  <T>Subtotal: {money(o.subtotal_cents??o.total_cents)}</T>
+                  {o.fulfillment==="delivery"&&<T>Taxa de entrega: {money(o.delivery_fee_cents??0)}</T>}
+                  <T bold>Total: {money(o.total_cents)}</T>
+                </View>
+                {["awaiting_confirmation","confirmed"].includes(o.status)&&
+                  <Button title="Cancelar pedido" secondary busy={busy}
+                    onPress={()=>Alert.alert("Cancelar pedido?","Esta ação altera o status do pedido.",[
+                      {text:"Voltar",style:"cancel"},
+                      {text:"Cancelar pedido",style:"destructive",onPress:()=>void run(async()=>{
+                        await api.request("orders/"+o.id,"PATCH",{status:"cancelled"});
+                        await refreshLatestOrders();
+                        if(focusedOrderId===o.id)await focusedOrder.reload().catch(()=>{});
+                      })},
+                    ])}/>}
+              </View>}
+            </View>;
+          })}
         {!!ordersCursor&&<Button title={loadingOlder?"Carregando pedidos...":"Ver pedidos anteriores"}
           disabled={loadingOlder||busy} secondary onPress={()=>void loadOlderOrders()}/>}
       </View>}
