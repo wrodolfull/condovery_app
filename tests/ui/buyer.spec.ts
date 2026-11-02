@@ -232,6 +232,7 @@ async function enter(page: Page, withAds = true, withFairs = true, extendedCatal
         hasMore: matched.length > (pageIndex + 1) * limit,
       };
     }
+    else if (endpoint === "shops/mine") value = { shop: null, products: [] };
     else if (endpoint === "shops/" + shop.id) value = { shop:activeShop, products:activeProducts };
     else if (endpoint.endsWith("/reviews"))
       value = {
@@ -295,6 +296,18 @@ async function checkNav(page: Page, selected?: string) {
     ),
   ).toBe(true);
 }
+
+test("seller shortcut replaces the condominium label and opens store creation", async ({page})=>{
+  const {errors}=await enter(page);
+  await expect(page.getByText("Você está em", {exact:true})).toHaveCount(0);
+  await expect(page.getByText("Condomínio de Teste", {exact:true})).toHaveCount(0);
+  const shortcut=page.getByRole("button",{name:"Minha loja / Quero vender",exact:true});
+  await expect(shortcut).toBeVisible();
+  await shortcut.click();
+  await expect(page.getByText("Comece a vender",{exact:true})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Criar minha loja"})).toBeVisible();
+  expect(errors).toEqual([]);
+});
 
 test("notification icon shows an unread badge when the server reports new notices", async ({page})=>{
   const {errors}=await enter(page,true,true,false,false,2);
