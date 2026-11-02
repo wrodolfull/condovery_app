@@ -309,6 +309,61 @@ test("seller shortcut replaces the condominium label and opens store creation", 
   expect(errors).toEqual([]);
 });
 
+test("seller orders have stage tabs and expandable cards without new statuses",async({page})=>{
+  const {errors}=await enter(page);
+  const mockShop={...shop,status:"approved",description:"Loja piloto",whatsapp:"11999990000",
+    cover_image:null,logo_image:null,delivery_fee_cents:500,pickup_instructions:""};
+  const rows=[
+    {id:id(6),code:1042,status:"awaiting_confirmation",buyer_name:"Mariana",buyer_phone:"11999990000",
+      shop_name:shop.name,tower:"Torre A",apartment:"101",fulfillment:"delivery",
+      subtotal_cents:2000,total_cents:2500,delivery_fee_cents:500,payment_method:"pix",
+      delivery_day:null,delivery_window:"",delivery_instructions:[],note:"",can_review:false,
+      created_at:"2026-11-02T16:00:00Z",
+      items:[{name:"Bolo de cenoura",quantity:1,unit_price_cents:2000,note:"Sem cobertura",options:[]}]},
+    {id:id(7),code:1041,status:"confirmed",buyer_name:"Carlos",shop_name:shop.name,
+      tower:"Torre B",apartment:"102",fulfillment:"pickup",subtotal_cents:1900,
+      total_cents:1900,delivery_fee_cents:0,delivery_day:null,delivery_window:"",
+      delivery_instructions:[],note:"",can_review:false,created_at:"2026-11-02T15:00:00Z",
+      items:[{name:"Brownie",quantity:1,unit_price_cents:1900,note:"",options:[]}]},
+    {id:id(8),code:1040,status:"cancelled",buyer_name:"Lucia",shop_name:shop.name,
+      tower:"Torre A",apartment:"103",fulfillment:"pickup",subtotal_cents:1400,
+      total_cents:1400,delivery_fee_cents:0,delivery_day:null,delivery_window:"",
+      delivery_instructions:[],note:"",can_review:false,created_at:"2026-11-01T15:00:00Z",
+      items:[{name:"Brigadeiro",quantity:2,unit_price_cents:700,note:"",options:[]}]},
+  ];
+  await page.route("https://condovery.example/api/shops/mine",route=>
+    route.fulfill({json:{shop:mockShop,products},headers:{"Access-Control-Allow-Origin":"*"}}));
+  await page.route(/\/api\/orders\?/,async route=>{
+    if(new URL(route.request().url()).searchParams.get("scope")!=="seller")return route.fallback();
+    await route.fulfill({json:{orders:rows,nextCursor:null,hasMore:false},
+      headers:{"Access-Control-Allow-Origin":"*"}});
+  });
+  await page.route(/\/api\/orders\/[0-9a-f-]+$/,async route=>{
+    if(route.request().method()!=="PATCH")return route.fallback();
+    const orderId=route.request().url().split("/").pop();
+    const changed=rows.find(o=>o.id===orderId);
+    if(!changed)return route.fulfill({status:404,json:{error:"Pedido não encontrado"}});
+    changed.status=route.request().postDataJSON().status;
+    await route.fulfill({json:{order:changed},headers:{"Access-Control-Allow-Origin":"*"}});
+  });
+  await page.getByRole("button",{name:"Acessar minha loja",exact:true}).click();
+  await expect(page.getByRole("button",{name:"Novos (1)"})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Em andamento (1)"})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Histórico (1)"})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Ver detalhes do pedido #1042"})).toBeVisible();
+  await expect(page.getByText("Itens do pedido",{exact:true})).toHaveCount(0);
+  await page.getByRole("button",{name:"Ver detalhes do pedido #1042"}).click();
+  await expect(page.getByText("Itens do pedido",{exact:true})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Cancelar pedido"})).toBeVisible();
+  await page.getByRole("button",{name:"Confirmar pedido"}).click();
+  await expect(page.getByRole("button",{name:"Novos (0)"})).toBeVisible();
+  await page.getByRole("button",{name:"Em andamento (2)"}).click();
+  await expect(page.getByRole("button",{name:"Ver detalhes do pedido #1042"})).toBeVisible();
+  await page.getByRole("button",{name:"Histórico (1)"}).click();
+  await expect(page.getByRole("button",{name:"Ver detalhes do pedido #1040"})).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test("inbox loads ten notices at a time and hides push diagnostics",async({page})=>{
   const {errors}=await enter(page);
   const notices=Array.from({length:12},(_,i)=>({
