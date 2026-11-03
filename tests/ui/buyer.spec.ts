@@ -440,6 +440,13 @@ for (const width of [360, 390, 430]) {
     }));
     expect(hintStyle.backgroundColor).toBe("rgb(255, 207, 37)");
     expect(parseFloat(hintStyle.borderRadius)).toBeGreaterThan(8);
+    const plusBox=await addHint.boundingBox();
+    const priceFooter=await product.getByTestId("product-price-footer").boundingBox();
+    expect(plusBox).toBeTruthy();
+    expect(priceFooter).toBeTruthy();
+    expect(plusBox!.y).toBeGreaterThanOrEqual(rect!.y+rect!.height-1);
+    expect(plusBox!.x).toBeGreaterThan(rect!.x+rect!.width/2);
+    expect(plusBox!.y+plusBox!.height).toBeLessThanOrEqual(priceFooter!.y+priceFooter!.height+1);
     await expect(adjacentProduct.getByTestId("product-add-hint")).toHaveCount(0);
     await expect(page.getByText("Produtos adicionados nos últimos 3 dias",{exact:true})).toHaveCount(0);
     await page.getByRole("button", { name: "Salvar nos favoritos", exact: true }).first().click();
