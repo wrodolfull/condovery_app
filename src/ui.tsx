@@ -472,6 +472,7 @@ export function ProductCard({
           <Picture path={p.image_url} label={p.name} aspectRatio={1} />
           {!unavailable && (
             <View
+              testID="product-add-hint"
               pointerEvents="none"
               accessibilityElementsHidden
               importantForAccessibility="no-hide-descendants"
