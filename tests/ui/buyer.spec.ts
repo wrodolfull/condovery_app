@@ -437,9 +437,13 @@ for (const width of [360, 390, 430]) {
     const hintStyle=await addHint.evaluate(element=>({
       backgroundColor:getComputedStyle(element).backgroundColor,
       borderRadius:getComputedStyle(element).borderRadius,
+      borderWidth:getComputedStyle(element).borderWidth,
+      boxShadow:getComputedStyle(element).boxShadow,
     }));
     expect(hintStyle.backgroundColor).toBe("rgb(255, 207, 37)");
     expect(parseFloat(hintStyle.borderRadius)).toBeGreaterThan(8);
+    expect(hintStyle.borderWidth).toBe("0px");
+    expect(hintStyle.boxShadow).toBe("none");
     const plusBox=await addHint.boundingBox();
     const priceFooter=await product.getByTestId("product-price-footer").boundingBox();
     expect(plusBox).toBeTruthy();
