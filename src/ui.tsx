@@ -469,33 +469,6 @@ export function ProductCard({
       >
         <View style={{ position: "relative" }}>
           <Picture path={p.image_url} label={p.name} aspectRatio={1} />
-          {!unavailable && (
-            <Pressable
-              testID="product-add-hint"
-              accessibilityRole="button"
-              accessibilityLabel={"Abrir " + p.name}
-              onPress={event=>{
-                event.stopPropagation();
-                openProduct();
-              }}
-              style={{
-                position: "absolute",
-                right: 10,
-                bottom: 10,
-                width: 40,
-                height: 40,
-                borderRadius: 12,
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: colors.yellow,
-                borderWidth: 2,
-                borderColor: "rgba(255,255,255,.92)",
-                boxShadow: "0 3px 12px rgba(36,27,13,.18)",
-              }}
-            >
-              <Plus size={22} strokeWidth={3} color={colors.ink} />
-            </Pressable>
-          )}
         </View>
         {p.promo_price_cents != null && (
           <View
@@ -520,6 +493,7 @@ export function ProductCard({
             paddingHorizontal: 11,
             paddingBottom: 14,
             gap: 1,
+            flex: 1,
             minHeight: 95,
             opacity: unavailable ? 0.72 : 1,
           }}
@@ -534,28 +508,56 @@ export function ProductCard({
             {p.shop_name}
           </T>
           <View
+            testID="product-price-footer"
             style={{
               flexDirection: "row",
-              flexWrap: "wrap",
-              alignItems: "baseline",
-              gap: 6,
-              marginTop: 5,
+              alignItems: "flex-end",
+              justifyContent: "space-between",
+              gap: 8,
+              marginTop: "auto",
+              paddingTop: 8,
             }}
           >
-            {p.promo_price_cents != null && (
-              <T
+            <View style={{ flex: 1, minWidth: 0, alignItems: "flex-start", gap: 1 }}>
+              {p.promo_price_cents != null && (
+                <T
+                  style={{
+                    fontSize: 10,
+                    color: "#898B85",
+                    textDecorationLine: "line-through",
+                  }}
+                >
+                  {money(p.price_cents)}
+                </T>
+              )}
+              <T bold style={{ fontSize: 15 }}>
+                {money(p.promo_price_cents ?? p.price_cents)}
+              </T>
+            </View>
+            {!unavailable && (
+              <Pressable
+                testID="product-add-hint"
+                accessibilityRole="button"
+                accessibilityLabel={"Abrir " + p.name}
+                onPress={event=>{
+                  event.stopPropagation();
+                  openProduct();
+                }}
                 style={{
-                  fontSize: 10,
-                  color: "#898B85",
-                  textDecorationLine: "line-through",
+                  width: 40,
+                  height: 40,
+                  borderRadius: 12,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: colors.yellow,
+                  borderWidth: 2,
+                  borderColor: "rgba(255,255,255,.92)",
+                  boxShadow: "0 3px 12px rgba(36,27,13,.12)",
                 }}
               >
-                {money(p.price_cents)}
-              </T>
+                <Plus size={22} strokeWidth={3} color={colors.ink} />
+              </Pressable>
             )}
-            <T bold style={{ fontSize: 15 }}>
-              {money(p.promo_price_cents ?? p.price_cents)}
-            </T>
           </View>
         </View>
       </Pressable>
