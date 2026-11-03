@@ -443,9 +443,9 @@ for (const width of [360, 390, 430]) {
     await expect(adjacentProduct.getByTestId("product-add-hint")).toHaveCount(0);
     await expect(page.getByText("Produtos adicionados nos últimos 3 dias",{exact:true})).toHaveCount(0);
     await page.getByRole("button", { name: "Salvar nos favoritos", exact: true }).first().click();
-    const hintBox=await addHint.boundingBox();
-    expect(hintBox).toBeTruthy();
-    await page.mouse.click(hintBox!.x+hintBox!.width/2,hintBox!.y+hintBox!.height/2);
+    // Playwright verifies that the quick action is actually hittable, rather
+    // than clicking screen coordinates potentially covered by the bottom nav.
+    await addHint.click();
     await expect(
       page.getByText("Preparado pelo vizinho.", { exact: true }),
     ).toBeVisible();
