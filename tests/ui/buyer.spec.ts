@@ -430,11 +430,26 @@ for (const width of [360, 390, 430]) {
     expect(Math.abs(rect!.width - rect!.height)).toBeLessThan(1);
     await expect(product.getByText("Oferta", { exact: true })).toBeVisible();
     await expect(page.getByText("Esgotado", { exact: true })).toBeVisible();
+    // The yellow plus is only a visual affordance inside the product button:
+    // tapping its coordinates opens customization/details without adding to cart.
+    const addHint=product.getByTestId("product-add-hint");
+    await expect(addHint).toBeVisible();
+    const hintStyle=await addHint.evaluate(element=>({
+      backgroundColor:getComputedStyle(element).backgroundColor,
+      borderRadius:getComputedStyle(element).borderRadius,
+    }));
+    expect(hintStyle.backgroundColor).toBe("rgb(255, 207, 37)");
+    expect(parseFloat(hintStyle.borderRadius)).toBeGreaterThan(8);
+    await expect(adjacentProduct.getByTestId("product-add-hint")).toHaveCount(0);
+    await expect(page.getByText("Produtos adicionados nos últimos 3 dias",{exact:true})).toHaveCount(0);
     await page.getByRole("button", { name: "Salvar nos favoritos", exact: true }).first().click();
-    await product.click();
+    const hintBox=await addHint.boundingBox();
+    expect(hintBox).toBeTruthy();
+    await page.mouse.click(hintBox!.x+hintBox!.width/2,hintBox!.y+hintBox!.height/2);
     await expect(
       page.getByText("Preparado pelo vizinho.", { exact: true }),
     ).toBeVisible();
+    await expect(page.getByText("Seu pedido · Loja do Vizinho", { exact: true })).toHaveCount(0);
     await checkNav(page);
     await page.getByRole("button", { name: /Adicionar ao carrinho por/ }).click();
     await expect(
