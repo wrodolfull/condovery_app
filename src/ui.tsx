@@ -444,6 +444,10 @@ export function ProductCard({
   const fav = market.favorites.data?.ids.includes(p.id);
   const closed = p.is_open === false;
   const unavailable = closed || p.stock === 0 || p.visibility !== "available";
+  const openProduct=()=>router.push({
+    pathname: "/produto/[shop]/[id]",
+    params: {shop:p.shop_id,id:p.id},
+  });
   return (
     <View
       style={[
@@ -460,22 +464,20 @@ export function ProductCard({
         accessibilityLabel={"Ver " + p.name}
         accessibilityState={{disabled:unavailable}}
         disabled={unavailable}
-        onPress={() =>
-          router.push({
-            pathname: "/produto/[shop]/[id]",
-            params: { shop: p.shop_id, id: p.id },
-          })
-        }
+        onPress={openProduct}
         style={{ opacity: unavailable ? 0.48 : 1, flex: 1 }}
       >
         <View style={{ position: "relative" }}>
           <Picture path={p.image_url} label={p.name} aspectRatio={1} />
           {!unavailable && (
-            <View
+            <Pressable
               testID="product-add-hint"
-              pointerEvents="none"
-              accessibilityElementsHidden
-              importantForAccessibility="no-hide-descendants"
+              accessibilityRole="button"
+              accessibilityLabel={"Abrir " + p.name}
+              onPress={event=>{
+                event.stopPropagation();
+                openProduct();
+              }}
               style={{
                 position: "absolute",
                 right: 10,
@@ -492,7 +494,7 @@ export function ProductCard({
               }}
             >
               <Plus size={22} strokeWidth={3} color={colors.ink} />
-            </View>
+            </Pressable>
           )}
         </View>
         {p.promo_price_cents != null && (
