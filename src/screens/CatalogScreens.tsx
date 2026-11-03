@@ -255,7 +255,6 @@ export function Home() {
           )}
           <Track
             title="Novidades por aqui"
-            subtitle="Produtos adicionados nos últimos 3 dias"
             products={recentProducts}
             showAction={false}
           />
@@ -388,8 +387,8 @@ function WeeklyOffers() {
     </View>
   );
 }
-function Track({ title, products, subtitle, showAction = true }: {
-  title: string; products: Product[]; subtitle?: string; showAction?: boolean;
+function Track({ title, products, showAction = true }: {
+  title: string; products: Product[]; showAction?: boolean;
 }) {
   if (!products.length) return null;
   return (
@@ -399,7 +398,6 @@ function Track({ title, products, subtitle, showAction = true }: {
         action={showAction ? "Explorar" : undefined}
         onAction={showAction ? () => router.push("/explorar") : undefined}
       />
-      {subtitle && <T style={{ fontSize: 12, color: "#77736B", marginTop: 4, marginBottom: 11 }}>{subtitle}</T>}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
