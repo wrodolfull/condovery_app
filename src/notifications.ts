@@ -28,6 +28,9 @@ export function useOpenNotification() {
           ...(destination.reviewId?{review_id:destination.reviewId}:{})
         }});
         return;
+      case "explore":
+        router.push("/explorar");
+        return;
       case "buyer-order":
         router.push({pathname:"/pedido/[id]",params:{id:destination.orderId}});
         return;

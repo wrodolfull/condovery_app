@@ -100,7 +100,7 @@ export type Order = {
 export type Notice = {
   id: string;
   kind: "order" | "seller_order" | "condominium" | "shop" |
-    "seller_review" | "seller_reminder";
+    "seller_review" | "seller_reminder" | "discovery_shop" | "discovery_products" | "discovery_sunday";
   title: string;
   body: string;
   target_id: string | null;

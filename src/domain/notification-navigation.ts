@@ -4,6 +4,7 @@ type Destination =
   | { screen: "seller"; tab: "Pedidos" | "Avaliações"; orderId?: string; reviewId?: string }
   | { screen: "buyer-order"; orderId: string }
   | { screen: "shop"; shopId: string }
+  | { screen: "explore" }
   | { screen: "notice" };
 
 const uuid = (value: string | null) =>
@@ -22,6 +23,10 @@ export function notificationDestination(
     return { screen: "seller", tab: "Avaliações", ...(uuid(id) ? { reviewId: id! } : {}) };
   if (notice.kind === "order" && uuid(id))
     return { screen: "buyer-order", orderId: id! };
+  if (notice.kind === "discovery_shop" && uuid(id))
+    return {screen:"shop",shopId:id!};
+  if (notice.kind === "discovery_products" || notice.kind === "discovery_sunday")
+    return {screen:"explore"};
   if (notice.kind === "shop" && uuid(id))
     return { screen: "shop", shopId: id! };
   return { screen: "notice" };
