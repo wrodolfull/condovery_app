@@ -412,6 +412,7 @@ type PushPreferences = {
   condominium: boolean;
   orders: boolean;
   seller_orders: boolean;
+  discovery: boolean;
 };
 export function Preferences() {
   const {api}=useAuth();
@@ -446,7 +447,8 @@ export function Preferences() {
         [
           ["condominium","Avisos do condomínio"],
           ["orders","Atualizações dos meus pedidos"],
-          ...(r.data.is_seller?[["seller_orders","Pedidos, avaliações e pendências da minha loja"]]:[])
+          ...(r.data.is_seller?[["seller_orders","Pedidos, avaliações e pendências da minha loja"]]:[]),
+          ["discovery","Novidades e descobertas da vizinhança (opcional)"]
         ] as [keyof PushPreferences,string][]
       ).map(([key,label])=>(
         <Card key={key} style={{
@@ -455,7 +457,7 @@ export function Preferences() {
           <T style={{flex:1}}>{label}</T>
           <Switch
             accessibilityLabel={label}
-            value={r.data!.preferences[key]}
+            value={r.data!.preferences[key]??false}
             disabled={busy}
             trackColor={{true:colors.orange}}
             onValueChange={value=>{
@@ -606,6 +608,10 @@ export function NoticeDetail() {
                 })
               }
             />
+          )}
+          {(n.kind==="discovery_shop"||n.kind==="discovery_products"||n.kind==="discovery_sunday")&&(
+            <Button title={n.kind==="discovery_shop"?"Conhecer a nova loja":"Explorar novidades"}
+              onPress={()=>void openNotification(n).catch(alertError)}/>
           )}
           {n.kind === "shop" && n.target_id && (
             <Button
