@@ -19,6 +19,8 @@ import {loadSellerDraft,saveSellerDraft} from "../storage";
 import { mergeLatestOrders, orderHistoryPath, type OrdersPage } from "../domain/order-pagination";
 import {sellerOrderSections,sellerOrderCounts,sellerOrdersInSection,sellerOrderSection,type SellerOrderSection} from "../domain/seller-order-sections";
 import {DailySalesChart} from "../components/DailySalesChart";
+import {openWhatsApp} from "../external";
+import {sellerBuyerWhatsApp,sellerOrderNeedsAttention,SELLER_ORDER_WAIT_ALERT_MINUTES} from "../domain/seller-order-service";
 import type {DailySale} from "../domain/seller-insights";
 
 type Shop = {
@@ -89,6 +91,8 @@ export default function SellerPanel() {
   const [orders,setOrders]=useState<Order[]>([]);
   const [sellerOrderView,setSellerOrderView]=useState<SellerOrderSection>("new");
   const [expandedSellerOrderId,setExpandedSellerOrderId]=useState<string|null>(focusedOrderId??null);
+  const [cancelDraft,setCancelDraft]=useState<{id:string;reason:string}|null>(null);
+  const [sellerClock,setSellerClock]=useState(()=>Date.now());
   // Prefer the freshest response after a seller changes status.
   const focusItem=orders.find(o=>o.id===focusedOrderId)??focusedOrder.data?.order;
   const visibleOrders=focusItem
@@ -186,7 +190,7 @@ export default function SellerPanel() {
       setOrders(previous=>mergeLatestOrders(r.orders,previous));
     }
     setOrdersError("");
-    setLastOrdersUpdate(new Date());
+    setLastOrdersUpdate(new Date());setSellerClock(Date.now());
   },[api]);
   useFocusEffect(useCallback(()=>{
     if(tab!=="Pedidos"||!shop?.id)return;
@@ -200,7 +204,7 @@ export default function SellerPanel() {
         if(initial||!historyLoaded.current){
           setOrders(page.orders);setOrdersCursor(page.nextCursor);
         }else setOrders(previous=>mergeLatestOrders(page.orders,previous));
-        setOrdersError("");setLastOrdersUpdate(new Date());
+        setOrdersError("");setLastOrdersUpdate(new Date());setSellerClock(Date.now());
       }catch(e){if(active)setOrdersError((e as Error).message);}
       finally{if(active&&initial)setOrdersLoading(false);}
     };
@@ -353,7 +357,7 @@ export default function SellerPanel() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:8}}>
         {tabs.map(t=><Pressable key={t} onPress={()=>{setTab(t);setError("");setSuccess("");setProductForm(null);}}
           style={{paddingHorizontal:15,paddingVertical:12,borderRadius:22,backgroundColor:t===tab?colors.ink:"#ECE8DF"}}>
-          <T bold style={{color:t===tab?"white":colors.ink}}>{t}</T>
+          <T bold style={{color:t===tab?"white":colors.ink}}>{t}{t==="Pedidos"&&orderCounts.new>0?" ("+orderCounts.new+")":""}</T>
         </Pressable>)}
       </ScrollView>
       {tab==="Pedidos"&&<View style={{gap:12}}>
@@ -401,6 +405,8 @@ export default function SellerPanel() {
               body={activeSellerOrderView==="new"?"Os novos pedidos aparecerão aqui.":activeSellerOrderView==="ongoing"?"Os pedidos confirmados aparecerão aqui.":"Pedidos concluídos e cancelados aparecerão aqui."}/>:
           filteredSellerOrders.map(o=>{
             const expanded=expandedSellerOrderId===o.id;
+            const overdue=sellerOrderNeedsAttention(o,sellerClock);
+            const buyerWhatsApp=sellerBuyerWhatsApp(o.buyer_phone,o.code);
             return <View key={o.id}
               style={o.id===focusedOrderId?{...line,borderColor:colors.orange,borderWidth:2}:line}>
               <Pressable accessibilityRole="button"
@@ -417,6 +423,12 @@ export default function SellerPanel() {
                 <T style={{color:colors.muted,fontSize:13}}>
                   {(o.buyer_name||"Morador")+" · "+(o.fulfillment==="delivery"?o.tower+" · Ap. "+o.apartment:"Retirada")}
                 </T>
+                {overdue&&<View style={{flexDirection:"row",alignItems:"center",gap:6,padding:8,
+                  backgroundColor:"#FFF5E4",borderColor:"#EFD3A3",borderWidth:1,borderRadius:11}}>
+                  <T bold style={{color:"#926027",fontSize:12}}>
+                    Aguardando confirmação há mais de {SELLER_ORDER_WAIT_ALERT_MINUTES} min
+                  </T>
+                </View>}
                 <T numberOfLines={2} style={{fontSize:14}}>
                   {o.items.slice(0,2).map(item=>item.quantity+"× "+item.name).join(" · ")}
                   {o.items.length>2?" · +"+(o.items.length-2)+" item(ns)":""}
@@ -446,6 +458,14 @@ export default function SellerPanel() {
                   if(focusedOrderId===o.id)await focusedOrder.reload().catch(()=>{});
                 })}/>}
               {expanded&&<View style={{gap:11,borderTopWidth:1,borderColor:colors.line,paddingTop:12}}>
+                {o.updated_at&&<T style={{fontSize:12,color:colors.muted}}>
+                  Status atualizado em {new Date(o.updated_at).toLocaleString("pt-BR")}
+                </T>}
+                {o.status==="cancelled"&&o.cancellation_reason&&<T>
+                  Motivo do cancelamento: {o.cancellation_reason}
+                </T>}
+                {buyerWhatsApp&&<Button title="Conversar com o comprador pelo WhatsApp" secondary
+                  onPress={()=>void openWhatsApp(buyerWhatsApp).catch(e=>setError((e as Error).message))}/>}
                 {sellerOrderDetails(o).map((detail,i)=><T key={"detail-"+i}>{detail}</T>)}
                 <T bold>Itens do pedido</T>
                 {o.items.map((item,i)=><View key={i}
@@ -459,16 +479,30 @@ export default function SellerPanel() {
                   {o.fulfillment==="delivery"&&<T>Taxa de entrega: {money(o.delivery_fee_cents??0)}</T>}
                   <T bold>Total: {money(o.total_cents)}</T>
                 </View>
-                {["awaiting_confirmation","confirmed"].includes(o.status)&&
-                  <Button title="Cancelar pedido" secondary busy={busy}
-                    onPress={()=>Alert.alert("Cancelar pedido?","Esta ação altera o status do pedido.",[
-                      {text:"Voltar",style:"cancel"},
-                      {text:"Cancelar pedido",style:"destructive",onPress:()=>void run(async()=>{
-                        await api.request("orders/"+o.id,"PATCH",{status:"cancelled"});
-                        await refreshLatestOrders();
-                        if(focusedOrderId===o.id)await focusedOrder.reload().catch(()=>{});
-                      })},
-                    ])}/>}
+                {["awaiting_confirmation","confirmed"].includes(o.status)&&(
+                  cancelDraft?.id===o.id?
+                    <View style={{gap:9,padding:11,borderWidth:1,borderColor:colors.line,borderRadius:12}}>
+                      <T bold>Cancelar pedido #{o.code}</T>
+                      <T style={{fontSize:12,color:colors.muted}}>O motivo aparecerá no histórico do comprador.</T>
+                      <Field label="Motivo do cancelamento" multiline maxLength={200}
+                        placeholder="Ex.: Produto indisponível" value={cancelDraft.reason}
+                        onChangeText={reason=>setCancelDraft(previous=>previous?{...previous,reason}:previous)}/>
+                      <T style={{fontSize:11,color:colors.muted}}>{cancelDraft.reason.length}/200 caracteres</T>
+                      <Button title="Confirmar cancelamento" busy={busy}
+                        disabled={cancelDraft.reason.trim().length<3}
+                        onPress={()=>void run(async()=>{
+                          await api.request("orders/"+o.id,"PATCH",{
+                            status:"cancelled",reason:cancelDraft.reason.trim()
+                          });
+                          setCancelDraft(null);
+                          await refreshLatestOrders();
+                          if(focusedOrderId===o.id)await focusedOrder.reload().catch(()=>{});
+                        })}/>
+                      <Button title="Voltar" secondary disabled={busy} onPress={()=>setCancelDraft(null)}/>
+                    </View>:
+                    <Button title="Cancelar pedido" secondary busy={busy}
+                      onPress={()=>setCancelDraft({id:o.id,reason:""})}/>
+                )}
               </View>}
             </View>;
           })}
