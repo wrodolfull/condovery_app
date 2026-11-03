@@ -550,9 +550,6 @@ export function ProductCard({
                   alignItems: "center",
                   justifyContent: "center",
                   backgroundColor: colors.yellow,
-                  borderWidth: 2,
-                  borderColor: "rgba(255,255,255,.92)",
-                  boxShadow: "0 3px 12px rgba(36,27,13,.12)",
                 }}
               >
                 <Plus size={22} strokeWidth={3} color={colors.ink} />
