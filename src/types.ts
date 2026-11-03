@@ -73,6 +73,8 @@ export type Order = {
   id: string;
   code: number;
   status: string;
+  updated_at?: string | null;
+  cancellation_reason?: string | null;
   total_cents: number;
   subtotal_cents: number;
   delivery_fee_cents: number;

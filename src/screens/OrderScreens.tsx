@@ -584,8 +584,11 @@ export function Orders() {
               <T>{statusLabels[o.status] ?? o.status}</T>
               <T bold>{money(o.total_cents)}</T>
               <T style={{ fontSize: 12, color: colors.muted }}>
-                {new Date(o.created_at).toLocaleString("pt-BR")}
+                Criado em {new Date(o.created_at).toLocaleString("pt-BR")}
               </T>
+              {o.updated_at&&<T style={{fontSize:12,color:colors.muted}}>
+                Status atualizado em {new Date(o.updated_at).toLocaleString("pt-BR")}
+              </T>}
             </Card>
           </Pressable>
         )}
@@ -637,6 +640,15 @@ export function OrderDetail({ success = false }: { success?: boolean }) {
           >
             {statusLabels[order.status]}
           </T>
+          {order.updated_at&&<T style={{fontSize:12,color:colors.muted}}>
+            Última atualização do pedido: {new Date(order.updated_at).toLocaleString("pt-BR")}
+          </T>}
+          {order.status==="cancelled"&&order.cancellation_reason&&(
+            <Card style={{borderColor:"#EEC4A4"}}>
+              <T bold>Motivo do cancelamento</T>
+              <T>{order.cancellation_reason}</T>
+            </Card>
+          )}
           {order.status !== "cancelled" && (
             <View
               style={{
