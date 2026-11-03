@@ -365,7 +365,7 @@ test("seller orders have stage tabs and expandable cards without new statuses",a
   await expect(page.getByRole("button",{name:"Conversar com o comprador pelo WhatsApp"})).toBeVisible();
   await page.getByRole("button",{name:"Cancelar pedido"}).click();
   await expect(page.getByLabel("Motivo do cancelamento")).toBeVisible();
-  await page.getByRole("button",{name:"Confirmar cancelamento"}).toBeDisabled();
+  await expect(page.getByRole("button",{name:"Confirmar cancelamento"})).toBeDisabled();
   await page.getByLabel("Motivo do cancelamento").fill("Produto indisponível");
   await page.getByRole("button",{name:"Confirmar cancelamento"}).click();
   await expect(page.getByRole("button",{name:"Em andamento (1)"})).toBeVisible();
