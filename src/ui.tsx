@@ -468,7 +468,32 @@ export function ProductCard({
         }
         style={{ opacity: unavailable ? 0.48 : 1, flex: 1 }}
       >
-        <Picture path={p.image_url} label={p.name} aspectRatio={1} />
+        <View style={{ position: "relative" }}>
+          <Picture path={p.image_url} label={p.name} aspectRatio={1} />
+          {!unavailable && (
+            <View
+              pointerEvents="none"
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              style={{
+                position: "absolute",
+                right: 10,
+                bottom: 10,
+                width: 40,
+                height: 40,
+                borderRadius: 12,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: colors.yellow,
+                borderWidth: 2,
+                borderColor: "rgba(255,255,255,.92)",
+                boxShadow: "0 3px 12px rgba(36,27,13,.18)",
+              }}
+            >
+              <Plus size={22} strokeWidth={3} color={colors.ink} />
+            </View>
+          )}
+        </View>
         {p.promo_price_cents != null && (
           <View
             style={{
