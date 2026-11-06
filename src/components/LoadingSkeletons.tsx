@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import {
   AccessibilityInfo,
   Animated,
@@ -40,7 +40,7 @@ function Pulse({
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
 }) {
-  const opacity = useRef(new Animated.Value(1)).current;
+  const [opacity] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
     let mounted = true;
