@@ -16,13 +16,13 @@ import {
   Empty,
   ErrorBox,
   Field,
-  Loading,
   Picture,
   Quantity,
   Screen,
   T,
   alertError,
 } from "../ui";
+import { SkeletonOrderList } from "../components/LoadingSkeletons";
 import { colors, money } from "../theme";
 import {
   arrivalInstructionOptions,
@@ -192,7 +192,7 @@ export function Checkout() {
   if (!market.cartReady)
     return (
       <Screen title="Carrinho" back>
-        <Loading />
+        <SkeletonOrderList count={2} />
       </Screen>
     );
   if (!shop || !cart.items.length)
@@ -559,7 +559,7 @@ export function Orders() {
           </View>
         }
         ListEmptyComponent={
-          r.loading ? <Loading /> : r.error ? null : (
+          r.loading && !r.error ? <SkeletonOrderList count={3} /> : r.error ? null : (
             <Empty
               title="Seus pedidos aparecerão aqui"
               body="Explore as lojas do seu condomínio para começar."
@@ -618,7 +618,7 @@ export function OrderDetail({ success = false }: { success?: boolean }) {
           <T>A confirmação e o pagamento serão combinados com a loja.</T>
         </>
       )}
-      {r.loading && <Loading />}
+      {r.loading && !order && !r.error && <SkeletonOrderList count={2} />}
       {order && <T style={{fontSize:12,color:colors.muted}}>
         {r.updatedAt ? "Atualizado às "+r.updatedAt.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}) : "Consultando status"}
       </T>}
