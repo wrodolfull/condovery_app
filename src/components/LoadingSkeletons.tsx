@@ -296,3 +296,31 @@ export function SkeletonReviews({ count = 2 }: { count?: number }) {
     </Pulse>
   );
 }
+
+
+/** Compact rows for push preferences and the notification inbox. */
+export function SkeletonTextCards({ count = 3 }: { count?: number }) {
+  return (
+    <Pulse style={{ gap: 12 }}>
+      {Array.from({ length: count }, (_, index) => (
+        <View key={index} style={{ padding: 16, gap: 10, backgroundColor: colors.card, borderRadius: 16 }}>
+          <Block width={index % 2 ? "65%" : "82%"} height={16} />
+          <Block width="94%" height={12} />
+          <Block width="39%" height={11} />
+        </View>
+      ))}
+    </Pulse>
+  );
+}
+
+export function SkeletonNoticeDetail() {
+  return (
+    <Pulse style={{ gap: 13 }}>
+      <Block width="88%" height={28} />
+      <Block width="98%" height={14} />
+      <Block width="92%" height={14} />
+      <Block width="72%" height={14} />
+      <Block width="40%" height={11} />
+    </Pulse>
+  );
+}
