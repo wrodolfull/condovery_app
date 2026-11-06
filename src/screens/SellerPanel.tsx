@@ -5,7 +5,8 @@ import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../auth";
 import { useMarket } from "../market";
 import { useResource } from "../hooks";
-import { Button, Card, Empty, ErrorBox, Field, Loading, Picture, Screen, T } from "../ui";
+import { Button, Card, Empty, ErrorBox, Field, Picture, Screen, T } from "../ui";
+import { SkeletonInsights, SkeletonOrderList, SkeletonSellerPanel } from "../components/LoadingSkeletons";
 import { money, colors } from "../theme";
 import { uploadPicture } from "../upload";
 import { allowedPaymentMethods, PAYMENT_LABELS, type PaymentMethod } from "../domain/payment-methods";
@@ -325,7 +326,7 @@ export default function SellerPanel() {
     <T style={{color:colors.muted}}>Gerencie seus produtos, pedidos e resultados no aplicativo.</T>
     <ErrorBox message={error}/>
     {!!success&&<T style={{color:colors.green}}>{success}</T>}
-    {loading?<Loading/>:!shop?<Card>
+    {loading?<SkeletonSellerPanel/>:!shop?<Card>
       <T heading style={{fontSize:22}}>Comece a vender</T>
       {draftDirty&&<T style={{color:colors.muted}}>Cadastro em rascunho: os campos preenchidos foram guardados neste dispositivo.</T>}
       <T>Cadastre sua loja para vender aos vizinhos do condomínio.</T>
@@ -395,7 +396,7 @@ export default function SellerPanel() {
           )}
         </ScrollView>
         <T style={{fontSize:11,color:colors.muted}}>Quantidades dos pedidos carregados.</T>
-        {ordersLoading&&!lastOrdersUpdate?<Loading/>:
+        {ordersLoading&&!lastOrdersUpdate?<SkeletonOrderList count={2}/>:
           !ordersError&&!filteredSellerOrders.length?
             <Empty title="Nenhum pedido nesta etapa"
               body={activeSellerOrderView==="new"?"Os novos pedidos aparecerão aqui.":activeSellerOrderView==="ongoing"?"Os pedidos confirmados aparecerão aqui.":"Pedidos concluídos e cancelados aparecerão aqui."}/>:
@@ -644,7 +645,7 @@ export default function SellerPanel() {
         </Pressable>)}</View>
         <Button title="Atualizar resultados" secondary onPress={()=>setInsightRevision(n=>n+1)}/>
         {insightError?<ErrorBox message={insightError} retry={()=>setInsightRevision(n=>n+1)}/>:null}
-        {insightLoading?<Loading/>:
+        {insightLoading?<SkeletonInsights/>:
           insight&&insight.days===period?<><Card style={{gap:8}}>
             <T>Pedidos recebidos: {insight.summary.orders_total}</T>
             <T>Aguardando confirmação: {insight.summary.awaiting}</T>
