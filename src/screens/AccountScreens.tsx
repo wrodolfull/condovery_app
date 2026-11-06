@@ -16,13 +16,13 @@ import {
   Empty,
   ErrorBox,
   Field,
-  Loading,
   Picture,
   Screen,
   T,
   alertError,
 } from "../ui";
 import { colors } from "../theme";
+import { SkeletonTextCards, SkeletonNoticeDetail } from "../components/LoadingSkeletons";
 import { openWeb } from "../external";
 import { uploadPicture } from "../upload";
 import type { Notice } from "../types";
@@ -442,7 +442,7 @@ export function Preferences() {
         onPress={()=>void toggleDevice()}
       />
       <ErrorBox message={r.error}/>
-      {r.loading&&<Loading/>}
+      {r.loading && !r.data && !r.error && <SkeletonTextCards count={4} />}
       {r.data&&(
         [
           ["condominium","Avisos do condomínio"],
@@ -544,7 +544,7 @@ export function Inbox() {
           </Card>
         </Pressable>
       ))}
-      {inbox.isPending&&<Loading/>}
+      {inbox.isPending && !inbox.error && <SkeletonTextCards count={4} />}
       {!inbox.isPending&&!items.length&&!inbox.error&&(
         <Empty title="Tudo em dia por aqui"
           body="Os avisos do condomínio e as atualizações de pedidos aparecerão aqui."/>
@@ -588,7 +588,7 @@ export function NoticeDetail() {
   return (
     <Screen title="Aviso" back>
       <ErrorBox message={r.error} />
-      {r.loading && <Loading />}
+      {r.loading && !r.data && !r.error && <SkeletonNoticeDetail />}
       {n && (
         <>
           <T heading style={{ fontSize: 27, lineHeight: 34 }}>
