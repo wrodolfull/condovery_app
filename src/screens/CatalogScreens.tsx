@@ -44,7 +44,6 @@ import {
   Empty,
   ErrorBox,
   Field,
-  Loading,
   Picture,
   ProductCard,
   ProductGrid,
@@ -74,6 +73,7 @@ import { FairHomeTeaser } from "../components/FairCards";
 import { ShopShareSheet } from "../components/ShopShareSheet";
 import { appendUniqueShops } from "../domain/shop-directory";
 import { remainingToAdd } from "../domain/cart-stock";
+import { SkeletonCategories, SkeletonProductGrid, SkeletonShopDetail, SkeletonShopList, SkeletonProductDetail, SkeletonReviews } from "../components/LoadingSkeletons";
 import { getCategoryImagePath } from "../domain/category-artwork";
 export function Home() {
   const { viewer } = useAuth();
@@ -153,7 +153,7 @@ export function Home() {
         <SearchBox value={query} onChangeText={setQuery} />
       </View>
       <View style={{ marginBottom: 10 }}>
-        <Categories categories={home.data?.categories ?? []} />
+        {home.loading && !home.data && !home.error ? <SkeletonCategories /> : <Categories categories={home.data?.categories ?? []} />}
       </View>
       {!query && (
         <LinearGradient
@@ -241,7 +241,6 @@ export function Home() {
         message={home.error || (query ? catalog.error : "")}
         retry={() => void home.reload().catch(() => {})}
       />
-      {home.loading && !home.data && <Loading />}
       {!query && (
         <>
           <FairHomeTeaser />
@@ -266,7 +265,7 @@ export function Home() {
         action={query ? undefined : "Ver produtos"}
         onAction={explore}
       />
-      {query && catalog.loading && <Loading />}
+      {((query && catalog.loading && !products.length && !catalog.error) || (!query && home.loading && !home.data && !home.error)) && <SkeletonProductGrid rows={2} />}
       <ProductGrid products={products} />
       {!products.length && !(query ? catalog.loading : home.loading) && (
         <Empty
@@ -295,6 +294,7 @@ export function Home() {
             onAction={explore}
           />
           <View style={{ gap: 10 }}>
+            {home.loading && !home.data && !home.error && <SkeletonShopList count={3} />}
             {home.data?.shops.slice(0, 8).map((shop) => (
               <ShopRow shop={shop} key={shop.id} />
             ))}
@@ -749,11 +749,11 @@ export function Explore() {
           if (item.kind === "shop") return <ShopRow shop={item.shop} />;
           if (item.kind === "shops-title")
             return <Section title="Todas as lojas" />;
-           if (item.kind === "shops-loading") return <Loading />;
+           if (item.kind === "shops-loading") return <SkeletonShopList count={directory.shops.length ? 1 : 3} />;
            if (item.kind === "shops-empty") return <Empty title="Nenhuma loja encontrada" body={query?"Tente buscar por outro nome.":"As lojas aprovadas aparecerão aqui."} />;
            if (item.kind === "shops-error") return <View style={{gap:10}}><ErrorBox message={directory.error}/><Button title="Tentar novamente" secondary onPress={directory.retry}/></View>;
            if (item.kind === "shops-more") return <Button title="Mostrar mais lojas" secondary onPress={directory.next}/>;
-          if (item.kind === "loading") return <Loading />;
+          if (item.kind === "loading") return <SkeletonProductGrid rows={products.length ? 1 : 2} />;
           if (item.kind === "empty")
             return (
               <Empty
@@ -813,7 +813,7 @@ export function Favorites() {
         }
         ListEmptyComponent={
           favorites.loading || savedShops.loading ? (
-            <Loading />
+            <SkeletonProductGrid rows={2} />
           ) : favorites.error || savedShops.error || !!savedShops.data?.shops.length ? null : (
             <Empty
               title="Seu próximo favorito mora aqui"
@@ -866,7 +866,7 @@ export function ShopDetail() {
         message={resource.error}
         retry={() => void resource.reload().catch(() => {})}
       />
-      {resource.loading && <Loading />}
+      {resource.loading && !shop && !resource.error && <SkeletonShopDetail />}
       {shop && (
         <>
           <View style={{opacity:shop.is_open?1:0.48}}>
@@ -1091,8 +1091,8 @@ export function ShopDetail() {
             message={reviews.error}
             retry={() => void reviews.reload().catch(() => {})}
           />
-          {reviews.loading ? (
-            <Loading />
+          {reviews.loading && !reviews.data ? (
+            <SkeletonReviews />
           ) : reviews.data?.reviews.length ? (
             reviews.data.reviews.map((review) => (
               <Card
@@ -1199,7 +1199,7 @@ export function ProductDetail() {
   return (
     <Screen title="Produto" back>
       <ErrorBox message={r.error || error} />
-      {r.loading && <Loading />}
+      {r.loading && !r.data && !r.error && <SkeletonProductDetail />}
       {p && shop ? (
         <>
           <View style={{opacity:purchasable?1:0.45}}><Picture

@@ -11,7 +11,6 @@ import {
   Empty,
   ErrorBox,
   Field,
-  Loading,
   Picture,
   ProductGrid,
   Screen,
@@ -19,6 +18,7 @@ import {
   alertError,
 } from "../ui";
 import { colors } from "../theme";
+import { SkeletonFairList, SkeletonProductGrid } from "../components/LoadingSkeletons";
 import { uploadPicture } from "../upload";
 import { openWhatsApp } from "../external";
 import type { Product, CommunityFair } from "../types";
@@ -39,7 +39,7 @@ export function Fairs() {
         message={resource.error}
         retry={() => void resource.reload().catch(() => {})}
       />
-      {resource.loading && <Loading />}
+      {resource.loading && !resource.data && !resource.error && <SkeletonFairList />}
       {resource.data?.fairs.map((fair) => (
         <Card key={fair.id} style={{ padding: 16, borderRadius: 16 }}>
           <FairArt fair={fair} />
@@ -75,7 +75,7 @@ export function Fair() {
         message={resource.error}
         retry={() => void resource.reload().catch(() => {})}
       />
-      {resource.loading && <Loading />}
+      {resource.loading && !resource.data && !resource.error && <SkeletonProductGrid rows={2} />}
       {resource.data && (
         <>
           <FairArt fair={resource.data.fair} />
@@ -210,7 +210,7 @@ export function Giveaways() {
       ) : (
         <Button title="Publicar meu desapego" onPress={() => edit(null)} />
       )}
-      {r.loading && <Loading />}
+      {r.loading && !r.data && !r.error && <SkeletonFairList count={1} />}
       {current && (
         <Card>
           <Picture
